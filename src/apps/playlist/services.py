@@ -167,7 +167,6 @@ class PlaylistService:
             },
         }
 
-    @transaction.atomic
     def create_generated_playlist(self, user_profile, params: Dict, kino_id: str):
         """
         入力:
@@ -237,7 +236,6 @@ class PlaylistService:
             track_ids, params["title"]
         )
 
-    @transaction.atomic
     def replace_tracks(
         self, playlist: T_Playlist, track_ids: List[str], kino_id: str
     ) -> Dict:
