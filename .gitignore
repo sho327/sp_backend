@@ -1,0 +1,19 @@
+### Django
+src/logs/*
+*.pot
+*.pyc
+__pycache__
+.DS_STORE
+.venv
+*.sqlite3
+media/
+local_settings.py
+
+### Other
+.env
+.idea
+
+mise.toml
+start.ps1
+start.sh
+gunicorn.py

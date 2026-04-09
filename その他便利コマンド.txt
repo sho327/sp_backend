@@ -1,0 +1,30 @@
+# -------------------------------------
+# テスト関連
+# -------------------------------------
+# 通常のテスト実行
+uv run --extra dev pytest
+
+# カバレッジありで実行 (htmlレポート生成)
+uv run --extra dev pytest --cov=src/apps/account --cov-report=html
+
+★ModuleNotFoundError: No module named 'apps' が発生している場合
+Python（pytest）が src フォルダをインポートのルートとして認識していない
+
+解決策
+1. PYTHONPATH を指定して実行する
+最も手っ取り早い方法は、実行時に src を検索パスに追加することです。
+```
+# Windows (PowerShell) の場合
+$env:PYTHONPATH="src"; uv run --extra dev pytest --cov=apps/account --cov-report=html
+```
+
+2. pyproject.toml に設定を追加する（推奨）
+毎回環境変数を設定するのは手間なので、設定ファイルに記述して自動化しましょう。
+pyproject.toml に以下のセクションを追加してください：
+```
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["src"]
+django_find_project = true
+DJANGO_SETTINGS_MODULE = "core.settings"  # 実際のsettingsのパスに合わせてください
+```

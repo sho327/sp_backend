@@ -1,0 +1,70 @@
+[project]
+name = "sample-backend"
+version = "0.1.0"
+description = "Django(DRF) Backend"
+requires-python = ">=3.12.7"
+dependencies = [
+    "django",
+    "django-environ",
+    "django-simple-history",
+    "djangorestframework",
+    "django-cors-headers",
+    "djangorestframework-simplejwt",
+    "spotipy",
+    "pillow>=12.2.0",
+]
+
+# isort本体(ライブラリ)とRuffの両方の設定を書いているのは、エディタのプラグイン対策
+# VSCodeなどで「isort拡張機能」を使っている場合は[tool.isort]が読み込まれる
+# 「Ruff拡張機能」を使っている場合は[tool.ruff]が読み込まれる
+# 両方書いておけば、開発メンバーがどちらの拡張機能を使っていても同じ整形結果になる
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort",
+    "ruff",
+    "pytest",
+    "pytest-django",
+    "pytest-mock",
+    "pytest-cov",
+    "factory-boy",
+]
+
+[tool.black]
+# Blackのルール設定
+line-length = 88           # 1行の長さを88文字に制限
+target-version = ["py312"] # 最小バージョンに合わせる
+
+[tool.isort]
+profile = "black"
+line_length = 88 # 1行の長さを88文字に制限
+# isortが「Djangoなどの外部ライブラリ」と「自分の書いたコード（appsなど）」の間に空行を入れて区別できるようになる設定
+known_first_party = ["spotify_tool_backend", "config", "apps.account"] # 自身のプロジェクトのパッケージ名
+multi_line_output = 3 # インポートが複数行にまたがる時のスタイル設定
+include_trailing_comma = true # 末尾にカンマ「,」を入れる設定
+
+[tool.ruff]
+# Ruffは爆速の静的解析ツールでflake8やisortの機能をこれ1つで代用
+line-length = 88 # 1行の長さを88文字に制限
+target-version = "py312" # Python 3.12の構文（新しい型の書き方など）を前提に解析
+# E,F,Wなどflake8相当のルールを有効化
+# E/W: Error&Warning(flake8相当)
+# F: Pyflakes(未使用の変数チェックなど)
+# I: isort(インポート順の並び替え)
+select = ["E", "F", "W", "I"] 
+ignore = ["E203"] # 特定のルールを無視。E203(コロン前のスペース)はBlackの整形と相性が悪いため、意図的にオフにする
+
+[tool.ruff.isort]
+# ruffにisortの役割も持たせる場合以下も設定(今回はisortをdevに入れたので併用も可)
+known-first-party = ["spotify_tool_backend", "config", "apps.account"] # 自身のプロジェクトのパッケージ名
+
+[tool.pytest.ini_options]
+# Pythonのモジュール検索パスにsrcを追加
+pythonpath = ["src"]
+# テストコードを探すディレクトリ
+testpaths = ["src"]
+# Djangoの設定ファイルを指定（プロジェクト構成に合わせてconfig.settingsやcore.settingsに書き換えて定義）
+DJANGO_SETTINGS_MODULE = "config.settings"
+# データベース作成を許可（pytest-djangoの設定）
+django_find_project = true
