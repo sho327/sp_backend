@@ -25,7 +25,7 @@ KINO_ID_BASE = "model-t-playlist"
 
 class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
     """
-    プレイリスト CRUD + 生成 + トラック差し替え + トラック検索 ViewSet
+    プレイリスト CRUD + 生成 + トラック差し替え + トラック検索 ViewSet
     """
 
     permission_classes = [IsAuthenticated]
@@ -33,8 +33,8 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
     playlist_service = PlaylistService()
 
     def get_queryset(self):
-        # ログインユーザー自身の、論理削除されていないプレイリストのみを返す
-        # タイムライン表示を想定し、新しい順で返却
+        # ログインユーザー自身の、論理削除されていないプレイリストのみを返す
+        # タイムライン表示を想定し、新しい順で返却
         return T_Playlist.objects.filter(
             user=self.request.user.user_t_profile_set,
             deleted_at__isnull=True,
@@ -48,7 +48,7 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
         入力:
         - request: DRF Request
         出力:
-        - ログインユーザーの T_Profile
+        - ログインユーザーの T_Profile
         副作用:
         - なし
         """
@@ -57,7 +57,7 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
     def _validate_serializer(self, serializer_cls, data):
         """
         入力:
-        - serializer_cls: バリデーションに使用するSerializerクラス
+        - serializer_cls: バリデーションに使用するSerializerクラス
         - data: request.data / request.query_params
         出力:
         - 検証済みSerializerインスタンス
@@ -67,18 +67,6 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
         serializer = serializer_cls(data=data)
         serializer.is_valid(raise_exception=True)
         return serializer
-
-    def _ok(self, payload, status_code=status.HTTP_200_OK):
-        """
-        入力:
-        - payload: レスポンス本文
-        - status_code: HTTPステータス
-        出力:
-        - DRF Response
-        副作用:
-        - なし
-        """
-        return Response(payload, status=status_code)
 
     # ------------------------------------------------------------------
     # 生成 (POST /api/v1/playlist/model-t_playlist/generate/)
@@ -90,9 +78,9 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
 
     def _perform_generate(self, request, *args, **kwargs):
         """
-        プレイリスト生成の実処理
+        プレイリスト生成の実処理
         """
-        # 1. 入力バリデーション
+        # 1. 入力バリデーション
         serializer = self._validate_serializer(GeneratePlaylistSerializer, request.data)
 
         try:
@@ -105,11 +93,11 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
         except ApplicationError:
             raise
         except Exception as e:
-            # 外部連携失敗はドメイン例外へ寄せる
+            # 外部連携失敗はドメイン例外へ寄せる
             raise PlaylistExternalServiceError() from e
 
-        # 3. レスポンス返却
-        return self._ok(
+        # 3. レスポンス返却
+        return Response(
             {"playlist": self.get_serializer(playlist).data, "trackset_urls": trackset_urls},
             status_code=status.HTTP_201_CREATED,
         )
@@ -124,15 +112,15 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
 
     def _perform_replace_tracks(self, request, *args, **kwargs):
         """
-        既存プレイリストのトラック明細を差し替える実処理
+        既存プレイリストのトラック明細を差し替える実処理
         """
-        # 1. 入力バリデーション（track_ids）
+        # 1. 入力バリデーション(track_ids)
         serializer = self._validate_serializer(ReplaceTracksSerializer, request.data)
 
-        # 2. 対象プレイリストを取得（存在しない場合は PlaylistNotFoundError）
+        # 2. 対象プレイリストを取得(存在しない場合は PlaylistNotFoundError)
         playlist = self.get_object()
 
-        # 3. サービスで明細差し替え
+        # 3. サービスで明細差し替え
         payload = self.playlist_service.replace_tracks(
             playlist=playlist,
             track_ids=serializer.validated_data["track_ids"],
@@ -140,7 +128,7 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
         )
 
         # 4. 結果返却
-        return self._ok(payload)
+        return Response(payload, status_code=status.HTTP_200_OK)
 
     # ------------------------------------------------------------------
     # トラック検索 (GET /api/v1/playlist/model-t_playlist/search-tracks/?...)
@@ -154,11 +142,11 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
         """
         アーティストを絞ったSpotifyトラック検索の実処理
         """
-        # 1. クエリパラメータのバリデーション
+        # 1. クエリパラメータのバリデーション
         serializer = self._validate_serializer(SearchTracksSerializer, request.query_params)
         data = serializer.validated_data
 
-        # 2. サービスで検索
+        # 2. サービスで検索
         payload = self.playlist_service.search_tracks(
             artist_spotify_id=data["artist_spotify_id"],
             q=data["q"],
@@ -166,7 +154,7 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
         )
 
         # 3. 検索結果返却
-        return self._ok(payload)
+        return Response(payload, status_code=status.HTTP_200_OK)
 
     # ------------------------------------------------------------------
     # 一覧取得 (GET /api/v1/playlist/model-t_playlist/)
@@ -179,18 +167,18 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
         """
         一覧取得の実処理
         """
-        # 1. ユーザー範囲のクエリセットを取得
+        # 1. ユーザー範囲のクエリセットを取得
         queryset = self.filter_queryset(self.get_queryset())
 
-        # 2. ページネーション適用（有効時）
+        # 2. ページネーション適用(有効時)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
 
-        # 3. ページネーション未使用時のフォールバック
+        # 3. ページネーション未使用時のフォールバック
         serializer = self.get_serializer(queryset, many=True)
-        return self._ok(serializer.data)
+        return Response(serializer.data, status_code=status.HTTP_200_OK)
 
     # ------------------------------------------------------------------
     # 詳細取得 (GET /api/v1/playlist/model-t_playlist/{id}/)
@@ -203,12 +191,12 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
         """
         詳細取得の実処理
         """
-        # 1. 対象プレイリストを取得
+        # 1. 対象プレイリストを取得
         instance = self.get_object()
 
-        # 2. レスポンス整形
+        # 2. レスポンス整形
         serializer = self.get_serializer(instance)
-        return self._ok(serializer.data)
+        return Response(serializer.data, status_code=status.HTTP_200_OK)
 
     # ------------------------------------------------------------------
     # 更新 (PATCH /api/v1/playlist/model-t_playlist/{id}/)
@@ -224,13 +212,13 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
         # 1. 対象取得
         instance = self.get_object()
 
-        # 2. DRF標準のpartial serializerで更新
+        # 2. DRF標準のpartial serializerで更新
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
 
         # 3. 更新後の値を返却
-        return self._ok(serializer.data)
+        return Response(serializer.data, status_code=status.HTTP_200_OK)
 
     # ------------------------------------------------------------------
     # 削除 (DELETE /api/v1/playlist/model-t_playlist/{id}/)
@@ -241,7 +229,7 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
 
     def _perform_destroy(self, request, *args, **kwargs):
         """
-        削除の実処理（論理削除）
+        削除の実処理(論理削除)
         """
         # 1. 対象取得
         instance = self.get_object()
@@ -249,7 +237,7 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
         # 2. 論理削除実行
         self.perform_destroy(instance)
 
-        # 3. 削除成功レスポンス
+        # 3. 削除成功レスポンス
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def perform_destroy(self, instance):
@@ -260,7 +248,7 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
         instance.save()
 
     def get_object(self):
-        # 404をPlaylistドメイン例外へ変換して一貫性を保つ
+        # 404をPlaylistドメイン例外へ変換して一貫性を保つ
         try:
             return super().get_object()
         except Http404 as e:
@@ -268,10 +256,10 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
 
     def _execute_action(self, action_func, request, *args, **kwargs):
         """
-        artist側と同様の共通実行メソッド
-        - 開始ログ
+        artist側と同様の共通実行メソッド
+        - 開始ログ
         - 本処理実行
-        - 終了ログ
+        - 終了ログ
         - 想定外例外の ApplicationError 変換
         """
         kino_id = f"{KINO_ID_BASE}_{self.action}"
