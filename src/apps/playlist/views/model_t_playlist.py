@@ -41,34 +41,6 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
         ).order_by("-created_at")
 
     # ------------------------------------------------------------------
-    # 共通ユーティリティ
-    # ------------------------------------------------------------------
-    def _get_user_profile(self, request):
-        """
-        入力:
-        - request: DRF Request
-        出力:
-        - ログインユーザーの T_Profile
-        副作用:
-        - なし
-        """
-        return request.user.user_t_profile_set
-
-    def _validate_serializer(self, serializer_cls, data):
-        """
-        入力:
-        - serializer_cls: バリデーションに使用するSerializerクラス
-        - data: request.data / request.query_params
-        出力:
-        - 検証済みSerializerインスタンス
-        副作用:
-        - 不正入力時に ValidationError を送出
-        """
-        serializer = serializer_cls(data=data)
-        serializer.is_valid(raise_exception=True)
-        return serializer
-
-    # ------------------------------------------------------------------
     # 生成 (POST /api/v1/playlist/model-t_playlist/generate/)
     # ------------------------------------------------------------------
     @logging_process_with_sql(f"{KINO_ID_BASE}_generate")
@@ -81,12 +53,13 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
         プレイリスト生成の実処理
         """
         # 1. 入力バリデーション
-        serializer = self._validate_serializer(GeneratePlaylistSerializer, request.data)
+        serializer = GeneratePlaylistSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
         try:
             # 2. 生成 + DB保存 + Trackset URL生成
             playlist, trackset_urls = self.playlist_service.create_generated_playlist(
-                user_profile=self._get_user_profile(request),
+                user_profile=request.user.user_t_profile_set,
                 params=serializer.validated_data,
                 kino_id=f"{KINO_ID_BASE}_generate",
             )
@@ -115,7 +88,8 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
         既存プレイリストのトラック明細を差し替える実処理
         """
         # 1. 入力バリデーション(track_ids)
-        serializer = self._validate_serializer(ReplaceTracksSerializer, request.data)
+        serializer = ReplaceTracksSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
         # 2. 対象プレイリストを取得(存在しない場合は PlaylistNotFoundError)
         playlist = self.get_object()
@@ -143,7 +117,8 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
         アーティストを絞ったSpotifyトラック検索の実処理
         """
         # 1. クエリパラメータのバリデーション
-        serializer = self._validate_serializer(SearchTracksSerializer, request.query_params)
+        serializer = SearchTracksSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
         # 2. サービスで検索
