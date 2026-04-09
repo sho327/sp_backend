@@ -4,24 +4,24 @@ from urllib.parse import quote
 
 from django.db import IntegrityError, transaction
 
-# --- アーティストモジュール ---
+# --- アーティストモジュール ---
 from apps.artist.models import T_Artist
 
-# --- 共通モジュール ---
+# --- 共通モジュール ---
 from apps.common.models import T_FileResource
 
-# --- プレイリストモジュール ---
+# --- プレイリストモジュール ---
 from apps.playlist.models import T_Playlist, T_PlaylistTrack
 
-# --- コアモジュール ---
+# --- コアモジュール ---
 from core.services.setlistfm_service import SetlistFmService
 from core.services.spotify_service import SpotifyService
-from core.utils.common import dedupe_keep_order
+from core.utils.common import dedupe_keep_order, take
 
 
 class PlaylistService:
     """
-    プレイリスト生成/保存/差し替えを担当するサービスクラス。
+    プレイリスト生成/保存/差し替えを担当するサービスクラス。
     役割:
     - setlist.fm+Spotifyを使って候補曲を生成
     - 生成結果をT_Playlist/T_PlaylistTrackへ保存
@@ -48,27 +48,27 @@ class PlaylistService:
     ) -> List[str]:
         """
         入力:
-        - pattern: 配合パターン（balanced/live_focus/popular_focus）
+        - pattern: 配合パターン(balanced/live_focus/popular_focus)
         - total_count: 返却したい最終曲数
         - live_uris/popular_uris/recommend_uris: ソース別URI配列
         出力:
         - 指定曲数に正規化されたURI配列
         副作用:
-        - なし（純粋関数）
+        - なし(純粋関数)
         """
-        # 1. パターン別比率を決定(未知パターンはbalancedへフォールバック)
+        # 1. パターン別比率を決定(未知パターンはbalancedへフォールバック)
         ratios = self.PATTERN_RATIOS.get(pattern, self.PATTERN_RATIOS["balanced"])
         live_count = int(total_count * ratios["live"])
         popular_count = int(total_count * ratios["popular"])
         recommend_count = total_count - live_count - popular_count
 
-        # 2. 比率分だけ各ソースから取り出す
+        # 2. 比率分だけ各ソースから取り出す
         mixed = []
-        mixed.extend(list(islice(live_uris, max(0, live_count))))
-        mixed.extend(list(islice(popular_uris, max(0, popular_count))))
-        mixed.extend(list(islice(recommend_uris, max(0, recommend_count))))
+        mixed.extend(take(live_uris,  live_count))
+        mixed.extend(take(popular_uris, popular_count))
+        mixed.extend(take(recommend_uris, recommend_count))
 
-        # 3. 枠不足時は残り候補で補完
+        # 3. 枠不足時は残り候補で補完
         if len(mixed) < total_count:
             rest = dedupe_keep_order(live_uris + popular_uris + recommend_uris)
             for uri in rest:
@@ -82,14 +82,14 @@ class PlaylistService:
     def generate_playlist(self, user_profile, params: Dict) -> Dict:
         """
         入力:
-        - user_profile: ログインユーザーのプロフィール
-        - params: 生成条件（artist_ids, mood, pattern 等）
+        - user_profile: ログインユーザーのプロフィール
+        - params: 生成条件(artist_ids, mood, pattern 等)
         出力:
-        - 生成結果辞書（artists/tracks/sources）
+        - 生成結果辞書(artists/tracks/sources)
         副作用:
-        - なし（外部API呼び出しは行うがDB更新はしない）
+        - なし(外部API呼び出しは行うがDB更新はしない)
         """
-        # 1. 生成対象のアーティストをユーザー所有データから取得
+        # 1. 生成対象のアーティストをユーザー所有データから取得
         artist_ids = params["artist_ids"]
         selected_artists = list(
             T_Artist.objects.filter(
@@ -101,7 +101,7 @@ class PlaylistService:
         if not selected_artists:
             return {"tracks": [], "artists": []}
 
-        # 2. パラメータを抽出
+        # 2. パラメータを抽出
         popular_tracks_count = params["popular_tracks_count"]
         use_recent_setlist = params["use_recent_setlist"]
         mood_brightness = params["mood_brightness"]
@@ -109,7 +109,7 @@ class PlaylistService:
         pattern = params["pattern"]
         total_tracks = params["total_tracks"]
 
-        # 1) 直近セトリ由来: ライブで演奏された可能性が高い曲を優先候補にする
+        # 1) 直近セトリ由来: ライブで演奏された可能性が高い曲を優先候補にする
         live_uris: List[str] = []
         if use_recent_setlist:
             for artist in selected_artists:
@@ -122,7 +122,7 @@ class PlaylistService:
                         live_uris.append(uri)
         live_uris = dedupe_keep_order(live_uris)
 
-        # 2) 人気曲: 初見ユーザーでも聴きやすい入口曲を確保する
+        # 2) 人気曲: 初見ユーザーでも聴きやすい入口曲を確保する
         popular_uris: List[str] = []
         for artist in selected_artists:
             popular_uris.extend(
@@ -133,7 +133,7 @@ class PlaylistService:
             )
         popular_uris = dedupe_keep_order(popular_uris)
 
-        # 3) ムード推薦: 明るさ/激しさを反映した補完候補を取得する
+        # 3) ムード推薦: 明るさ/激しさを反映した補完候補を取得する
         seed_artists = [a.spotify_id for a in selected_artists if a.spotify_id][:5]
         recommend_uris = self.spotify_service.fetch_recommendation_tracks(
             seed_artists=seed_artists,
@@ -143,7 +143,7 @@ class PlaylistService:
         )
         recommend_uris = dedupe_keep_order(recommend_uris)
 
-        # 4) パターン配合: 3ソースを指定比率で合成して最終候補を作る
+        # 4) パターン配合: 3ソースを指定比率で合成して最終候補を作る
         track_uris = self._mix_uris(
             pattern=pattern,
             total_count=total_tracks,
@@ -153,7 +153,7 @@ class PlaylistService:
         )
         track_details = self.spotify_service.fetch_tracks_detail_by_uris(track_uris)
 
-        # 5. APIレスポンス用に整形して返却
+        # 5. APIレスポンス用に整形して返却
         return {
             "artists": [
                 {"id": str(a.id), "name": a.name, "spotify_id": a.spotify_id}
@@ -171,25 +171,25 @@ class PlaylistService:
     def create_generated_playlist(self, user_profile, params: Dict, kino_id: str):
         """
         入力:
-        - user_profile: ログインユーザーのプロフィール
-        - params: 生成条件 + 保存情報（title/image_id）
-        - kino_id: 操作ログ/監査用の処理識別子
+        - user_profile: ログインユーザーのプロフィール
+        - params: 生成条件 + 保存情報(title/image_id)
+        - kino_id: 操作ログ/監査用の処理識別子
         出力:
         - (playlistインスタンス, trackset_urls)
         副作用:
-        - T_Playlist / T_PlaylistTrack を新規作成（トランザクション内）
+        - T_Playlist / T_PlaylistTrack を新規作成(トランザクション内)
         """
-        # 1. まず生成処理を行い、候補曲を取得
+        # 1. まず生成処理を行い、候補曲を取得
         generated = self.generate_playlist(user_profile=user_profile, params=params)
 
-        # 2. 画像指定がある場合のみ参照を解決
+        # 2. 画像指定がある場合のみ参照を解決
         image = None
         if params.get("image_id"):
             image = T_FileResource.objects.filter(
                 id=params["image_id"], deleted_at__isnull=True
             ).first()
 
-        # 3. プレイリスト本体を作成
+        # 3. プレイリスト本体を作成
         playlist = T_Playlist.objects.create(
             user=user_profile,
             title=params["title"],
@@ -201,14 +201,14 @@ class PlaylistService:
             updated_method=kino_id,
         )
 
-        # 4. 生成対象アーティストをプレイリストに紐付け
+        # 4. 生成対象アーティストをプレイリストに紐付け
         playlist.artists.set(
             T_Artist.objects.filter(
                 id__in=params["artist_ids"], user=user_profile, deleted_at__isnull=True
             )
         )
 
-        # 5. 生成曲をプレイリスト明細へ保存（Spotify ID保持）
+        # 5. 生成曲をプレイリスト明細へ保存(Spotify ID保持)
         for track in generated["tracks"]:
             preview_resource = self._resolve_preview_resource(
                 preview_url=track.get("preview_url"),
@@ -243,13 +243,13 @@ class PlaylistService:
     ) -> Dict:
         """
         入力:
-        - playlist: 更新対象プレイリスト
+        - playlist: 更新対象プレイリスト
         - track_ids: 差し替え後のSpotify曲ID配列
-        - kino_id: 操作ログ/監査用の処理識別子
+        - kino_id: 操作ログ/監査用の処理識別子
         出力:
-        - 差し替え結果辞書（updated_count, playlist_id）
+        - 差し替え結果辞書(updated_count, playlist_id)
         副作用:
-        - 既存明細を論理削除し、新規明細を作成（トランザクション内）
+        - 既存明細を論理削除し、新規明細を作成(トランザクション内)
         """
         # 1. 既存明細を論理削除
         old_tracks = playlist.playlist_t_playlist_track_set.filter(
@@ -292,12 +292,12 @@ class PlaylistService:
         """
         入力:
         - artist_spotify_id: 絞り込み対象アーティストのSpotify ID
-        - q: 検索キーワード
+        - q: 検索キーワード
         - limit: 最大取得件数
         出力:
         - 検索結果配列
         副作用:
-        - なし（Spotify API呼び出しのみ）
+        - なし(Spotify API呼び出しのみ)
         """
         return self.spotify_service.search_tracks(
             q=q,
