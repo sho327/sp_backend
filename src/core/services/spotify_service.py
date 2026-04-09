@@ -1,4 +1,6 @@
 from datetime import timedelta
+from typing import List
+from urllib.parse import quote
 
 import spotipy
 from django.conf import settings
@@ -242,6 +244,33 @@ class SpotifyService:
             return []
         except Exception as e:
             raise ExternalServiceError() from e
+
+    # ------------------------------------------------------------------
+    # その他メソッド
+    # ------------------------------------------------------------------
+
+    def create_spotify_tracksets(
+        track_ids: List[str], title: str = "MyList", chunk_size: int = 50
+    ) -> List[str]:
+        """
+        入力:
+        - track_ids: Spotify曲ID配列
+        - title: URL上のタイトル文字列
+        - chunk_size: 1URLあたりの最大曲数（デフォルト50）
+        出力:
+        - Trackset共有URL配列
+        副作用:
+        - なし（純粋関数）
+        """
+        urls = []
+        encoded_title = quote(title)
+        for i in range(0, len(track_ids), chunk_size):
+            chunk = track_ids[i : i + chunk_size]
+            ids = ",".join(chunk)
+            urls.append(
+                f"https://open.spotify.com/trackset/{encoded_title}_{i // chunk_size + 1}/{ids}"
+            )
+        return urls
 
 
 # -----------------------------------------

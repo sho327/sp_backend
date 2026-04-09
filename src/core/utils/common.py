@@ -1,10 +1,11 @@
 import os
 import random
 import string
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 # 汎用的なヘルパー関数やデータクレンジング処理を定義する。
 # 利用例: フォーム入力値のNull/空白チェック
+
 
 def set_str_or_blank_format(pStr: Optional[str]) -> str:
     """
@@ -42,6 +43,7 @@ def set_int_format(pInt: Optional[Union[int, str]]) -> Optional[int]:
         # 変換できない場合はNoneを返す
         return None
 
+
 def clean_input_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     辞書内の文字列データから前後の空白文字を削除し、データの前処理を行う。
@@ -53,3 +55,15 @@ def clean_input_data(data: Dict[str, Any]) -> Dict[str, Any]:
         else:
             cleaned_data[key] = value
     return cleaned_data
+
+
+def dedupe_keep_order(values: List[str]) -> List[str]:
+    """
+    入力:
+    - values: 重複を含む可能性のある文字列配列
+    出力:
+    - 重複を除去しつつ、元順序を維持した配列
+    副作用:
+    - なし（純粋関数）
+    """
+    return list(dict.fromkeys([v for v in values if v]))

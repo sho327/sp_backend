@@ -131,14 +131,6 @@ class T_PlaylistTrack(BaseModel):
         null=True,
         blank=True,
     )
-    # プレビューURL
-    preview_url = models.URLField(
-        db_column="preview_url",
-        verbose_name="プレビューURL",
-        db_comment="プレビューURL",
-        blank=True,
-        null=True,
-    )
     # Spotify/ID
     spotify_id = models.CharField(
         db_column="spotify_id",
