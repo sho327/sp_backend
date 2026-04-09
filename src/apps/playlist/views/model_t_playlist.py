@@ -215,8 +215,11 @@ class Model_T_PlaylistViewSet(viewsets.ModelViewSet):
         # 3. 削除成功レスポンス
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    # ------------------------------------------------------------------
+    # Django標準メソッドのオーバーライド
+    # ------------------------------------------------------------------
     def perform_destroy(self, instance):
-        """論理削除"""
+        """論理削除(必要ないが論理削除を明示的にするためにあえて定義)"""
         instance.updated_by_id = self.request.user.id
         instance.updated_method = f"{KINO_ID_BASE}_delete"
         instance.deleted_at = timezone.now()
