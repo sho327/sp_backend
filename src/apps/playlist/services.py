@@ -1,3 +1,4 @@
+from enum import Enum
 from itertools import islice
 from typing import Dict, List
 from urllib.parse import quote
@@ -33,6 +34,18 @@ class PlaylistService:
         "live_focus": {"live": 0.6, "popular": 0.2, "recommend": 0.2},
         "popular_focus": {"live": 0.2, "popular": 0.6, "recommend": 0.2},
     }
+
+    class GENERATE_PATTERN(Enum):
+        """プレイリスト生成パターンの定義"""
+
+        TOP_TRACKS = "top_tracks"
+        SET_LIST = "set_list"
+        MOODFILTER = "moodfilter"
+
+        @classmethod
+        def get_values(cls) -> List[str]:
+            """定義されている全ての値（ロガー名）をリストで返す"""
+            return [i.value for i in cls]
 
     def __init__(self):
         self.spotify_service = SpotifyService()
@@ -79,13 +92,13 @@ class PlaylistService:
 
         return dedupe_keep_order(mixed)[:total_count]
 
-    def generate_playlist(self, user_profile, params: Dict) -> Dict:
+    def generate_playlist(self, user: M_User, params: Dict) -> Dict:
         """
         入力:
-        - user_profile: ログインユーザーのプロフィール
-        - params: 生成条件（artist_ids, mood, pattern 等）
+        - user: ログインユーザー
+        - valided_data
         出力:
-        - 生成結果辞書（artists/tracks/sources）
+        - 生成結果辞書(artists/tracks/sources)
         副作用:
         - なし（外部API呼び出しは行うがDB更新はしない）
         """
@@ -102,46 +115,54 @@ class PlaylistService:
             return {"tracks": [], "artists": []}
 
         # 2. パラメータを抽出
+        pattern = params["pattern"]
         popular_tracks_count = params["popular_tracks_count"]
         use_recent_setlist = params["use_recent_setlist"]
         mood_brightness = params["mood_brightness"]
         mood_intensity = params["mood_intensity"]
-        pattern = params["pattern"]
         total_tracks = params["total_tracks"]
 
-        # 1) 直近セトリ由来: ライブで演奏された可能性が高い曲を優先候補にする
-        live_uris: List[str] = []
-        if use_recent_setlist:
+        # 関連アーティストの取得
+
+        # 3. パターンによる分岐
+        # A. 人気曲/TopTracksでの生成の場合
+        if pattern == self.GENERATE_PATTERN.TOP_TRACKS.value:
+            popular_uris: List[str] = []
             for artist in selected_artists:
-                song_names = self.setlist_service.get_latest_setlist_song_names(
-                    artist.name
+                popular_uris.extend(
+                    self.spotify_service.fetch_top_tracks(
+                        artist.spotify_id,
+                        limit=popular_tracks_count,
+                    )
                 )
-                for song_name in song_names:
-                    uri = self.spotify_service.search_track_uri(artist.name, song_name)
-                    if uri:
-                        live_uris.append(uri)
-        live_uris = dedupe_keep_order(live_uris)
-
-        # 2) 人気曲: 初見ユーザーでも聴きやすい入口曲を確保する
-        popular_uris: List[str] = []
-        for artist in selected_artists:
-            popular_uris.extend(
-                self.spotify_service.fetch_top_tracks(
-                    artist.spotify_id,
-                    limit=popular_tracks_count,
-                )
+            popular_uris = dedupe_keep_order(popular_uris)
+        # B. 直近のセットリスト/SetListでの生成の場合
+        elif pattern == self.GENERATE_PATTERN.SET_LIST.value:
+            live_uris: List[str] = []
+            if use_recent_setlist:
+                for artist in selected_artists:
+                    song_names = self.setlist_service.get_latest_setlist_song_names(
+                        artist.name
+                    )
+                    for song_name in song_names:
+                        uri = self.spotify_service.search_track_uri(
+                            artist.name, song_name
+                        )
+                        if uri:
+                            live_uris.append(uri)
+            live_uris = dedupe_keep_order(live_uris)
+        # C. ムードフィルター/Moodfilterでの生成の場合
+        elif pattern == self.GENERATE_PATTERN.MOODFILTER.value:
+            seed_artists = [a.spotify_id for a in selected_artists if a.spotify_id][:5]
+            recommend_uris = self.spotify_service.fetch_recommendation_tracks(
+                seed_artists=seed_artists,
+                target_valence=mood_brightness / 100.0,
+                target_energy=mood_intensity / 100.0,
+                limit=total_tracks,
             )
-        popular_uris = dedupe_keep_order(popular_uris)
+            recommend_uris = dedupe_keep_order(recommend_uris)
 
-        # 3) ムード推薦: 明るさ/激しさを反映した補完候補を取得する
-        seed_artists = [a.spotify_id for a in selected_artists if a.spotify_id][:5]
-        recommend_uris = self.spotify_service.fetch_recommendation_tracks(
-            seed_artists=seed_artists,
-            target_valence=mood_brightness / 100.0,
-            target_energy=mood_intensity / 100.0,
-            limit=total_tracks,
-        )
-        recommend_uris = dedupe_keep_order(recommend_uris)
+        track_uris = []
 
         # 4) パターン配合: 3ソースを指定比率で合成して最終候補を作る
         track_uris = self._mix_uris(

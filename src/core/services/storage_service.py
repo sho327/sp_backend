@@ -1,83 +1,56 @@
+import os
+import uuid
+from pathlib import Path
 from typing import BinaryIO, Optional
 
+# --- コアモジュール ---
 from core.exceptions import ExternalServiceError
-
-# 役割: Cloudinary/S3など、外部ストレージへのファイルアップロード・削除処理を統一的に扱う。
-# 利用例: ユーザーのアバター画像、作品のサムネイル画像の保存/削除。
 
 
 class StorageService:
     """
-    外部ストレージ（Cloudinary/S3など）へのファイルアップロード・削除処理を一括管理するサービス。
-    外部通信の責務をビジネスロジックから分離する。
+    ストレージサービス
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, base_dir: str = "media"):
+        self.base_path = Path(base_dir)
+        self.base_path.mkdir(parents=True, exist_ok=True)
 
     def upload_file(
-        self, file_data: BinaryIO, folder_path: str, filename: str
+        self, file_data: BinaryIO, folder_path: str, original_filename: str
     ) -> Optional[str]:
-        """
-        ファイルを外部ストレージにアップロードし、公開URLを返す。
-
-        Args:
-            file_data: アップロードするファイルデータ
-            folder_path: 保存先フォルダパス
-            filename: ファイル名
-
-        Returns:
-            アップロードされたファイルの公開URL
-
-        Raises:
-            ExternalServiceError: アップロードに失敗した場合
-        """
         try:
-            # --- [TODO] Cloudinary SDKなどを使ったアップロード処理を実装 ---
-            # 例:
-            # import cloudinary.uploader
-            # result = cloudinary.uploader.upload(file_data, folder=folder_path, public_id=filename)
-            # return result['secure_url']
+            # 拡張子の取得 (.png, .jpg など)
+            extension = os.path.splitext(original_filename)[1]
+            # UUIDで新しいファイル名を生成
+            new_filename = f"{uuid.uuid4()}{extension}"
 
-            # 暫定実装（開発環境用）
-            print(f"File uploaded to: {folder_path}/{filename}")
-            # 成功時はURLを返す
-            return f"https://cdn.shelio.com/{folder_path}/{filename}.png"
+            target_dir = self.base_path / folder_path
+            target_dir.mkdir(parents=True, exist_ok=True)
+            file_path = target_dir / new_filename
+
+            # 保存
+            with open(file_path, "wb") as f:
+                # file_data が InMemoryUploadedFile の場合は read() で取得
+                f.write(file_data.read())
+
+            # DB保存用のパスを返す
+            return f"{folder_path}/{new_filename}"
 
         except Exception as e:
-            # 外部サービスのエラーとして例外を投げる
             raise ExternalServiceError(
-                message="ファイルのアップロードに失敗しました。",
-                details={
-                    "folder_path": folder_path,
-                    "filename": filename,
-                    "internal_error": str(e),
-                },
+                message="ファイルの保存に失敗しました。",
+                details={"error": str(e)},
             )
 
     def delete_file(self, file_url: str) -> bool:
-        """
-        公開URLに基づいてファイルを外部ストレージから削除する。
-
-        Args:
-            file_url: 削除するファイルの公開URL
-
-        Returns:
-            削除に成功した場合True、失敗した場合False
-
-        Raises:
-            ExternalServiceError: 削除に失敗した場合（オプション）
-        """
         try:
-            # --- [TODO] 外部ストレージの削除処理を実装 ---
-            # 例:
-            # import cloudinary.uploader
-            # cloudinary.uploader.destroy(public_id)
-
-            # 暫定実装（開発環境用）
-            print(f"File deleted: {file_url}")
-            return True
+            # URLパスから実際のファイルパスに変換(先頭の/を取り除く等)
+            file_path = Path(file_url.lstrip("/"))
+            if file_path.exists():
+                os.remove(file_path)
+                return True
+            return False
         except Exception as e:
-            # ログ出力は呼び出し側で行うため、ここでは例外を投げるかFalseを返す
-            print(f"Storage Deletion Failed: {e}")
+            print(f"File Deletion Failed: {e}")
             return False
