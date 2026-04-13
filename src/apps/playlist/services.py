@@ -5,24 +5,33 @@ from urllib.parse import quote
 
 from django.db import IntegrityError, transaction
 
-# --- アーティストモジュール ---
+# --- アーティストモジュール ---
 from apps.artist.models import T_Artist
 
-# --- 共通モジュール ---
+# --- 共通モジュール ---
 from apps.common.models import T_FileResource
 
-# --- プレイリストモジュール ---
+# --- プレイリストモジュール ---
 from apps.playlist.models import T_Playlist, T_PlaylistTrack
+from apps.playlist.exceptions import (
+    PlaylistError,
+    PlaylistNotFoundError,
+    PlaylistAlreadyExistsError,
+    PlaylistCreateError,
+    PlaylistReplaceError,
+    PlaylistExternalServiceError,
+    InvalidPlaylistRequestError,
+)
 
-# --- コアモジュール ---
+# --- コアモジュール ---
 from core.services.setlistfm_service import SetlistFmService
 from core.services.spotify_service import SpotifyService
-from core.utils.common import dedupe_keep_order
+from core.utils.common import dedupe_keep_order, take
 
 
 class PlaylistService:
     """
-    プレイリスト生成/保存/差し替えを担当するサービスクラス。
+    プレイリスト生成/保存/差し替えを担当するサービスクラス。
     役割:
     - setlist.fm+Spotifyを使って候補曲を生成
     - 生成結果をT_Playlist/T_PlaylistTrackへ保存
@@ -61,27 +70,27 @@ class PlaylistService:
     ) -> List[str]:
         """
         入力:
-        - pattern: 配合パターン（balanced/live_focus/popular_focus）
+        - pattern: 配合パターン(balanced/live_focus/popular_focus)
         - total_count: 返却したい最終曲数
         - live_uris/popular_uris/recommend_uris: ソース別URI配列
         出力:
         - 指定曲数に正規化されたURI配列
         副作用:
-        - なし（純粋関数）
+        - なし(純粋関数)
         """
-        # 1. パターン別比率を決定(未知パターンはbalancedへフォールバック)
+        # 1. パターン別比率を決定(未知パターンはbalancedへフォールバック)
         ratios = self.PATTERN_RATIOS.get(pattern, self.PATTERN_RATIOS["balanced"])
         live_count = int(total_count * ratios["live"])
         popular_count = int(total_count * ratios["popular"])
         recommend_count = total_count - live_count - popular_count
 
-        # 2. 比率分だけ各ソースから取り出す
+        # 2. 比率分だけ各ソースから取り出す
         mixed = []
-        mixed.extend(list(islice(live_uris, max(0, live_count))))
-        mixed.extend(list(islice(popular_uris, max(0, popular_count))))
-        mixed.extend(list(islice(recommend_uris, max(0, recommend_count))))
+        mixed.extend(take(live_uris,  live_count))
+        mixed.extend(take(popular_uris, popular_count))
+        mixed.extend(take(recommend_uris, recommend_count))
 
-        # 3. 枠不足時は残り候補で補完
+        # 3. 枠不足時は残り候補で補完
         if len(mixed) < total_count:
             rest = dedupe_keep_order(live_uris + popular_uris + recommend_uris)
             for uri in rest:
@@ -94,25 +103,27 @@ class PlaylistService:
 
     def generate_playlist(self, user: M_User, params: Dict) -> Dict:
         """
+        プレイリスト生成(外部API中心)
         入力:
         - user: ログインユーザー
         - valided_data
         出力:
         - 生成結果辞書(artists/tracks/sources)
         副作用:
-        - なし（外部API呼び出しは行うがDB更新はしない）
+        - なし(外部API呼び出しは行うがDB更新はしない)
         """
-        # 1. 生成対象のアーティストをユーザー所有データから取得
-        artist_ids = params["artist_ids"]
-        selected_artists = list(
-            T_Artist.objects.filter(
-                id__in=artist_ids,
-                user=user_profile,
-                deleted_at__isnull=True,
+        try:
+            # 1. 生成対象のアーティストをユーザー所有データから取得
+            artist_ids = params["artist_ids"]
+            selected_artists = list(
+                T_Artist.objects.filter(
+                    id__in=artist_ids,
+                    user=user_profile,
+                    deleted_at__isnull=True,
+                )
             )
-        )
-        if not selected_artists:
-            return {"tracks": [], "artists": []}
+            if not selected_artists:
+                raise PlaylistNotFoundError()
 
         # 2. パラメータを抽出
         pattern = params["pattern"]
@@ -174,151 +185,170 @@ class PlaylistService:
         )
         track_details = self.spotify_service.fetch_tracks_detail_by_uris(track_uris)
 
-        # 5. APIレスポンス用に整形して返却
-        return {
-            "artists": [
-                {"id": str(a.id), "name": a.name, "spotify_id": a.spotify_id}
-                for a in selected_artists
-            ],
-            "tracks": track_details,
-            "sources": {
-                "live_set_tracks": len(live_uris),
-                "popular_tracks": len(popular_uris),
-                "recommended_tracks": len(recommend_uris),
-            },
-        }
+            # 5. APIレスポンス用に整形して返却
+            return {
+                "artists": [
+                    {"id": str(a.id), "name": a.name, "spotify_id": a.spotify_id}
+                    for a in selected_artists
+                ],
+                "tracks": track_details,
+                "sources": {
+                    "live_set_tracks": len(live_uris),
+                    "popular_tracks": len(popular_uris),
+                    "recommended_tracks": len(recommend_uris),
+                },
+            }
+        except PlaylistError:
+            raise
+        except Exception as e:
+            raise PlaylistError() from e
 
-    @transaction.atomic
     def create_generated_playlist(self, user_profile, params: Dict, kino_id: str):
         """
+        プレイリスト生成(DB保存)
         入力:
-        - user_profile: ログインユーザーのプロフィール
-        - params: 生成条件 + 保存情報（title/image_id）
-        - kino_id: 操作ログ/監査用の処理識別子
+        - user_profile: ログインユーザーのプロフィール
+        - params: 生成条件 + 保存情報(title/image_id)
+        - kino_id: 操作ログ/監査用の処理識別子
         出力:
         - (playlistインスタンス, trackset_urls)
         副作用:
-        - T_Playlist / T_PlaylistTrack を新規作成（トランザクション内）
+        - T_Playlist / T_PlaylistTrack を新規作成(トランザクション内)
         """
-        # 1. まず生成処理を行い、候補曲を取得
-        generated = self.generate_playlist(user_profile=user_profile, params=params)
+        try:
+            # 1. まず生成処理を行い、候補曲を取得
+            generated = self.generate_playlist(user_profile=user_profile, params=params)
 
-        # 2. 画像指定がある場合のみ参照を解決
-        image = None
-        if params.get("image_id"):
-            image = T_FileResource.objects.filter(
-                id=params["image_id"], deleted_at__isnull=True
-            ).first()
+            # 2. 画像指定がある場合のみ参照を解決
+            image = None
+            if params.get("image_id"):
+                image = T_FileResource.objects.filter(
+                    id=params["image_id"], deleted_at__isnull=True
+                ).first()
 
-        # 3. プレイリスト本体を作成
-        playlist = T_Playlist.objects.create(
-            user=user_profile,
-            title=params["title"],
-            image=image,
-            spotify_id=None,
-            created_by_id=user_profile.user_id,
-            created_method=kino_id,
-            updated_by_id=user_profile.user_id,
-            updated_method=kino_id,
-        )
-
-        # 4. 生成対象アーティストをプレイリストに紐付け
-        playlist.artists.set(
-            T_Artist.objects.filter(
-                id__in=params["artist_ids"], user=user_profile, deleted_at__isnull=True
-            )
-        )
-
-        # 5. 生成曲をプレイリスト明細へ保存（Spotify ID保持）
-        for track in generated["tracks"]:
-            preview_resource = self._resolve_preview_resource(
-                preview_url=track.get("preview_url"),
-                user_profile=user_profile,
-                kino_id=kino_id,
-            )
-            T_PlaylistTrack.objects.create(
-                playlist=playlist,
-                name=track.get("name") or "",
-                artist=None,
-                preview_resource=preview_resource,
-                spotify_id=track.get("spotify_id"),
+            # 3. プレイリスト本体を作成
+            playlist = T_Playlist.objects.create(
+                user=user_profile,
+                title=params["title"],
+                image=image,
+                spotify_id=None,
                 created_by_id=user_profile.user_id,
                 created_method=kino_id,
                 updated_by_id=user_profile.user_id,
                 updated_method=kino_id,
             )
 
-        # 6. 共有用Trackset URLを生成して返却
-        track_ids = [
-            track["spotify_id"]
-            for track in generated["tracks"]
-            if track.get("spotify_id")
-        ]
-        return playlist, self.spotify_service.create_spotify_tracksets(
-            track_ids, params["title"]
-        )
+            # 4. 生成対象アーティストをプレイリストに紐付け
+            playlist.artists.set(
+                T_Artist.objects.filter(
+                    id__in=params["artist_ids"], user=user_profile, deleted_at__isnull=True
+                )
+            )
 
-    @transaction.atomic
+            # 5. 生成曲をプレイリスト明細へ保存(Spotify ID保持)
+            for track in generated["tracks"]:
+                preview_resource = self._resolve_preview_resource(
+                    preview_url=track.get("preview_url"),
+                    user_profile=user_profile,
+                    kino_id=kino_id,
+                )
+                T_PlaylistTrack.objects.create(
+                    playlist=playlist,
+                    name=track.get("name") or "",
+                    artist=None,
+                    preview_resource=preview_resource,
+                    spotify_id=track.get("spotify_id"),
+                    created_by_id=user_profile.user_id,
+                    created_method=kino_id,
+                    updated_by_id=user_profile.user_id,
+                    updated_method=kino_id,
+                )
+
+            # 6. 共有用Trackset URLを生成して返却
+            track_ids = [
+                track["spotify_id"]
+                for track in generated["tracks"]
+                if track.get("spotify_id")
+            ]
+            return playlist, self.spotify_service.create_spotify_tracksets(
+            track_ids, params["title"]
+            )
+        except PlaylistError:
+            raise
+        except IntegrityError as e:
+            raise PlaylistCreateError() from e
+        except Exception as e:
+            raise PlaylistError() from e
+
     def replace_tracks(
         self, playlist: T_Playlist, track_ids: List[str], kino_id: str
     ) -> Dict:
         """
+        プレイリスト更新(DB保存)
         入力:
-        - playlist: 更新対象プレイリスト
+        - playlist: 更新対象プレイリスト
         - track_ids: 差し替え後のSpotify曲ID配列
-        - kino_id: 操作ログ/監査用の処理識別子
+        - kino_id: 操作ログ/監査用の処理識別子
         出力:
-        - 差し替え結果辞書（updated_count, playlist_id）
+        - 差し替え結果辞書(updated_count, playlist_id)
         副作用:
-        - 既存明細を論理削除し、新規明細を作成（トランザクション内）
+        - 既存明細を論理削除し、新規明細を作成(トランザクション内)
         """
-        # 1. 既存明細を論理削除
-        old_tracks = playlist.playlist_t_playlist_track_set.filter(
-            deleted_at__isnull=True
-        )
-        for row in old_tracks:
-            row.deleted_at = row.updated_at
-            row.updated_method = kino_id
-            row.save()
-
-        # 2. Spotify曲IDから詳細を取得
-        uris = [f"spotify:track:{track_id}" for track_id in track_ids]
-        details = self.spotify_service.fetch_tracks_detail_by_uris(uris)
-
-        # 3. 新しい明細を作成
-        created = 0
-        for track in details:
-            preview_resource = self._resolve_preview_resource(
-                preview_url=track.get("preview_url"),
-                user_profile=playlist.user,
-                kino_id=kino_id,
+        try:
+            # 1. 既存明細を論理削除
+            old_tracks = playlist.playlist_t_playlist_track_set.filter(
+                deleted_at__isnull=True
             )
-            T_PlaylistTrack.objects.create(
-                playlist=playlist,
-                name=track.get("name") or "",
-                artist=None,
-                preview_resource=preview_resource,
-                spotify_id=track.get("spotify_id"),
-                created_by_id=playlist.user.user_id,
-                created_method=kino_id,
-                updated_by_id=playlist.user.user_id,
-                updated_method=kino_id,
-            )
-            created += 1
+            for row in old_tracks:
+                row.deleted_at = row.updated_at
+                row.updated_method = kino_id
+                row.save()
 
-        # 4. 置換結果を返却
-        return {"updated_count": created, "playlist_id": str(playlist.id)}
+            # 2. Spotify曲IDから詳細を取得
+            uris = [
+                f"spotify:track:{track_id}" 
+                for track_id in track_ids
+            ]
+            details = self.spotify_service.fetch_tracks_detail_by_uris(uris)
+
+            # 3. 新しい明細を作成
+            created = 0
+            for track in details:
+                preview_resource = self._resolve_preview_resource(
+                    preview_url=track.get("preview_url"),
+                    user_profile=playlist.user,
+                    kino_id=kino_id,
+                )
+                T_PlaylistTrack.objects.create(
+                    playlist=playlist,
+                    name=track.get("name") or "",
+                    artist=None,
+                    preview_resource=preview_resource,
+                    spotify_id=track.get("spotify_id"),
+                    created_by_id=playlist.user.user_id,
+                    created_method=kino_id,
+                    updated_by_id=playlist.user.user_id,
+                    updated_method=kino_id,
+                )
+                created += 1
+
+            # 4. 置換結果を返却
+            return {"updated_count": created, "playlist_id": str(playlist.id)}
+        except PlaylistError:
+            raise
+        except Exception as e:
+            raise PlaylistReplaceError() from e
 
     def search_tracks(self, artist_spotify_id: str, q: str, limit: int = 20):
         """
         入力:
         - artist_spotify_id: 絞り込み対象アーティストのSpotify ID
-        - q: 検索キーワード
+        - q: 検索キーワード
         - limit: 最大取得件数
         出力:
         - 検索結果配列
         副作用:
-        - なし（Spotify API呼び出しのみ）
+        - なし(Spotify API呼び出しのみ)
         """
         return self.spotify_service.search_tracks(
             q=q,

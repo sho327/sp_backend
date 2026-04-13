@@ -33,6 +33,30 @@ class InvalidPlaylistRequestError(PlaylistError):
     detail = "プレイリスト操作のリクエスト内容が不正です。"
 
 
+class PlaylistAlreadyExistsError(PlaylistError):
+    """同名プレイリストなどの重複エラー"""
+    status_code = status.HTTP_409_CONFLICT
+    message_id = "ERR_PLY_103"
+    message = "Playlist Already Exists Error"
+    detail = "同じ名前のプレイリストが既に存在します。"
+
+
+class PlaylistCreateError(PlaylistError):
+    """プレイリスト作成失敗"""
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    message_id = "ERR_PLY_104"
+    message = "Playlist Create Error"
+    detail = "プレイリストの作成に失敗しました。"
+
+
+class PlaylistReplaceError(PlaylistError):
+    """トラック差し替え失敗"""
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    message_id = "ERR_PLY_105"
+    message = "Playlist Replace Error"
+    detail = "プレイリストの曲差し替えに失敗しました。"
+
+
 # --------------------------------------------------
 # 外部連携系 (502, 503)
 # --------------------------------------------------
