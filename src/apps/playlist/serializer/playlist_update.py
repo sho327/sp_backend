@@ -3,10 +3,12 @@ from rest_framework import serializers
 # --- アーティストモジュール ---
 from apps.artist.models import T_Artist
 
+
 class PlaylistUpdateRequestSerializer(serializers.Serializer):
     """
     入力：フロントエンドから送られてくるデータの検品
     """
+
     title = serializers.CharField(required=True)
     image_url = serializers.URLField(required=False, allow_null=True)
     spotify_id = serializers.CharField(required=True)

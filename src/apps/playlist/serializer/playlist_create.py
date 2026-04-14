@@ -3,11 +3,13 @@ from rest_framework import serializers
 # --- アーティストモジュール ---
 from apps.artist.models import T_Artist
 
+
 class PlaylistCreateRequestSerializer(serializers.Serializer):
     """
     入力：フロントエンドから送られてくるデータの検品
     ※バイナリ画像を扱うため、Multipartリクエスト専用
     """
+
     title = serializers.CharField(required=True)
     image = serializers.ImageField()
     spotify_id = serializers.CharField(required=True)

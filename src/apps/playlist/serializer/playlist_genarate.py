@@ -3,11 +3,13 @@ from rest_framework import serializers
 # --- アーティストモジュール ---
 from apps.artist.models import T_Artist
 
+
 class PlaylistGenerateRequestSerializer(serializers.Serializer):
     """
     入力：フロントエンドから送られてくるデータの検品
     ※バイナリ画像を扱うため、Multipartリクエスト専用
     """
+
     title = serializers.CharField(required=True)
     image = serializers.ImageField()
     spotify_id = serializers.CharField(required=True)
@@ -21,9 +23,6 @@ class PlaylistGenerateRequestSerializer(serializers.Serializer):
         required=False,
         allow_null=True,
     )
-    # -------------------------------------------------------
-    # プレイリスト生成時のオプション
-    # -------------------------------------------------------
     pattern = serializers.ChoiceField(
         choices=["top_tracks", "set_list", "moodfilter"],
         default="top_tracks",
