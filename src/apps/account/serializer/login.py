@@ -1,11 +1,15 @@
 from rest_framework import serializers
 
-class LoginSerializer(serializers.Serializer):
+class LoginRequestSerializer(serializers.Serializer):
     """
-    ログインAPIのSerializerクラス
-    Create
-        Author: Kato Shogo
+    入力：フロントエンドから送られてくるデータの検品
     """
+    email = serializers.EmailField(required=True, help_text="メールアドレス")
+    password = serializers.CharField(required=True, help_text="パスワード")
 
-    email = serializers.EmailField(required=True)
-    password = serializers.CharField(required=True)
+class LoginResponseSerializer(serializers.Serializer):
+    """
+    出力：フロントエンドへ返すデータの定義
+    ※ refresh_token は Cookie 管理のため、ここには含めない
+    """
+    access_token = serializers.CharField(help_text="アクセストークン(JWT等)")

@@ -2,9 +2,13 @@ import hashlib
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
+
+# --- コアモジュール ---
 from core.utils.common import generate_secure_token
 
+# --- アカウントモジュール ---
 from apps.account.models import T_UserToken
+
 User = get_user_model()
 
 class CommonService:

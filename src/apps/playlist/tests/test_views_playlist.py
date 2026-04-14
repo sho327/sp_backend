@@ -3,8 +3,13 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
+# --- アカウントモジュール
 from apps.account.tests.factories import UserFactory
+
+# --- アーティストモジュール
 from apps.artist.tests.factories import ArtistFactory
+
+# --- プレイリストモジュール
 from apps.playlist.tests.factories import PlaylistFactory, PlaylistTrackFactory
 
 
@@ -26,7 +31,7 @@ class TestPlaylistViews:
             return_value=["Song A"],
         )
         mocker.patch(
-            "apps.playlist.services.SpotifyService.search_track_uri",
+            "apps.playlist.services.SpotifyService.search_tracks",
             return_value="spotify:track:aaa",
         )
         mocker.patch(
@@ -51,7 +56,7 @@ class TestPlaylistViews:
             ],
         )
 
-        url = reverse("playlist:model_t_playlist-generate")
+        url = reverse("playlist:playlist-generate")
         response = api_client.post(
             url,
             {
@@ -76,12 +81,12 @@ class TestPlaylistViews:
         playlist = PlaylistFactory(user=profile, title="Timeline")
         PlaylistTrackFactory(playlist=playlist, name="Track 1")
 
-        list_url = reverse("playlist:model_t_playlist-list")
+        list_url = reverse("playlist:playlist-list")
         list_res = api_client.get(list_url)
         assert list_res.status_code == status.HTTP_200_OK
         assert len(list_res.data) >= 1
 
-        detail_url = reverse("playlist:model_t_playlist-detail", args=[playlist.id])
+        detail_url = reverse("playlist:playlist-detail", args=[playlist.id])
         detail_res = api_client.get(detail_url)
         assert detail_res.status_code == status.HTTP_200_OK
         assert detail_res.data["track_count"] == 1
@@ -102,7 +107,7 @@ class TestPlaylistViews:
                 }
             ],
         )
-        url = reverse("playlist:model_t_playlist-replace-tracks", args=[playlist.id])
+        url = reverse("playlist:playlist-replace-tracks", args=[playlist.id])
         response = api_client.post(url, {"track_ids": ["ttt"]}, format="json")
         assert response.status_code == status.HTTP_200_OK
         assert response.data["playlist_id"] == str(playlist.id)
@@ -123,7 +128,7 @@ class TestPlaylistViews:
             ],
         )
 
-        url = reverse("playlist:model_t_playlist-search-tracks")
+        url = reverse("playlist:playlist-search-tracks")
         response = api_client.get(
             url,
             {
@@ -141,7 +146,7 @@ class TestPlaylistViews:
         profile = api_client.handler._force_user.user_t_profile_set
         playlist = PlaylistFactory(user=profile, title="Before")
 
-        detail_url = reverse("playlist:model_t_playlist-detail", args=[playlist.id])
+        detail_url = reverse("playlist:playlist-detail", args=[playlist.id])
         patch_res = api_client.patch(detail_url, {"title": "After"}, format="json")
         assert patch_res.status_code == status.HTTP_200_OK
         assert patch_res.data["title"] == "After"
@@ -152,6 +157,6 @@ class TestPlaylistViews:
     def test_replace_tracks_validation_error(self, api_client):
         profile = api_client.handler._force_user.user_t_profile_set
         playlist = PlaylistFactory(user=profile)
-        url = reverse("playlist:model_t_playlist-replace-tracks", args=[playlist.id])
+        url = reverse("playlist:playlist-replace-tracks", args=[playlist.id])
         response = api_client.post(url, {"track_ids": []}, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST

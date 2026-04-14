@@ -1,10 +1,13 @@
 from rest_framework import serializers
 
-class AccountActivateSerializer(serializers.Serializer):
+class AccountActivateRequestSerializer(serializers.Serializer):
     """
-    アカウントアクティベートAPIのSerializerクラス
-    Create 
-        Author: Kato Shogo
+    入力：フロントエンドから送られてくるデータの検品
     """
+    token = serializers.CharField(required=True, help_text="アクティベート用トークン")
 
-    token = serializers.CharField(required=True)
+class AccountActivateResponseSerializer(serializers.Serializer):
+    """
+    出力：フロントエンドへ返すデータの定義
+    """
+    pass

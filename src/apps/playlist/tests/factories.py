@@ -1,7 +1,12 @@
 import factory
 
+# --- アカウントモジュール ---
 from apps.account.tests.factories import UserFactory
+
+# --- アーティストモジュール
 from apps.artist.tests.factories import ArtistFactory
+
+# --- プレイリストモジュール
 from apps.playlist.models import T_Playlist, T_PlaylistTrack
 
 

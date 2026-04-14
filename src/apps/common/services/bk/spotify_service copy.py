@@ -51,7 +51,7 @@ class SpotifyService:
         try:
             # DBからトークン情報を取得(行ロック)
             token_obj = T_SpotifyUserToken.objects.select_for_update().get(
-                user=self.user,  # もしモデルにuser紐付けがある場合
+                email=self.user.email,  # もしモデルにuser紐付けがある場合
                 deleted_at__isnull=True,
             )
         except T_SpotifyUserToken.DoesNotExist:

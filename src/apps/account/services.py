@@ -6,10 +6,14 @@ from django.contrib.auth.models import update_last_login
 from django.db import transaction, IntegrityError
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
+
 # --- コアモジュール ---
 from core.consts import LOG_METHOD
 from core.utils.log_helpers import log_output_by_msg_id
-from core.services.email_service import EmailService
+
+# --- 共通モジュール ---
+from apps.common.services.email_service import EmailService
+
 # --- アカウントモジュール ---
 from apps.account.exceptions import (
     AccountLockedError,

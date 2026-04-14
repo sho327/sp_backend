@@ -2,6 +2,7 @@ from django.db import models
 from django.db.models import Q, UniqueConstraint
 from simple_history.models import HistoricalRecords
 
+# --- コアモジュール ---
 from core.models import BaseModel
 
 

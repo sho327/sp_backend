@@ -1,23 +1,23 @@
 from datetime import datetime
 from django.utils import timezone
-from rest_framework.views import APIView
-from rest_framework import status
 from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
+
 # --- コアモジュール ---
 from core.decorators.logging_process_with_sql import logging_process_with_sql
 from core.consts import LOG_METHOD
 from core.utils.log_helpers import log_output_by_msg_id
-from core.utils.date_format import convert_to_site_timezone, date_to_str
+from core.utils.date_format import convert_to_site_timezone
 from core.exceptions.exceptions import ApplicationError
+from core.views import BaseAPIView
+
 # --- アカウントモジュール ---
-from apps.account.serializer.signup import SignupSerializer
+from apps.account.serializer.signup import SignupRequestSerializer, SignupResponseSerializer
 from apps.account.services import AccountService
 
 
 KINO_ID = "signup"
 
-class SignupView(APIView):
+class SignupView(BaseAPIView):
     """
     新規登録処理APIクラス
     Create
@@ -26,7 +26,7 @@ class SignupView(APIView):
     permission_classes = [AllowAny]
     account_service = AccountService()
 
-    @logging_process_with_sql(KINO_ID)
+    @logging_process_with_sql
     def post(self, request, *args, **kwargs):
         """
         POSTリクエストを受け付ける。
@@ -65,7 +65,7 @@ class SignupView(APIView):
         # 1. 処理開始ログ出力(アプリケーションログ)
         log_output_by_msg_id(log_id="MSGI003", params=[KINO_ID, str(request.data)], logger_name=LOG_METHOD.APPLICATION.value)
         # 2. リクエストデータ検証
-        serializer = SignupSerializer(data=request.data)
+        serializer = SignupRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         # 3. 新規登録(サービス実行)
         self.account_service.signup(
@@ -73,10 +73,12 @@ class SignupView(APIView):
             kino_id=KINO_ID, 
             **serializer.validated_data,
         )
-        response_param = {
-            "executeAt": date_to_str(target_date=date_now, target_format="%Y/%m/%d %H:%M:%S"),
-        }
+        # 4. レスポンス作成（ここがポイント）
+        # 空であってもResponseSerializerを通す/「このAPIが何を返すか」がViewの最後を見れば一目でわかるようにする
+        # data=Noneまたは空辞書を渡すことで、executeAtだけが入ったレスポンスとなる
+        res_serializer = SignupResponseSerializer({})
+        response = self.get_success_map_response(data=res_serializer.data)
         # 4. 処理終了ログ出力(アプリケーションログ)
-        log_output_by_msg_id(log_id="MSGI004", params=[KINO_ID, str(response_param)], logger_name=LOG_METHOD.APPLICATION.value)
+        log_output_by_msg_id(log_id="MSGI004", params=[KINO_ID, str(response.data)], logger_name=LOG_METHOD.APPLICATION.value)
         # 5. レスポンス返却
-        return Response(response_param, status=status.HTTP_200_OK)
+        return response

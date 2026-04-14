@@ -1,5 +1,6 @@
 from rest_framework import status
 
+# --- コアモジュール ---
 from core.exceptions.exceptions import ApplicationError, ExternalServiceError
 
 

@@ -3,6 +3,7 @@ from typing import List, Optional
 import requests
 from django.conf import settings
 
+# --- コアモジュール ---
 from core.exceptions.exceptions import ExternalServiceError
 
 

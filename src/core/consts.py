@@ -30,6 +30,17 @@ class LOG_METHOD(Enum):
         """定義されている全ての値（ロガー名）をリストで返す"""
         return [i.value for i in cls]
 
+# プレイリスト生成パターン
+class PLAYLIST_GENERATE_PATTERN(Enum):
+    """プレイリスト生成パターン"""
+    TOP_TRACKS = "top_tracks"
+    SET_LIST = "set_list"
+    MOODFILTER = "moodfilter"
+
+    @classmethod
+    def get_values(cls) -> List[str]:
+        """定義されている全ての値（ロガー名）をリストで返す"""
+        return [i.value for i in cls]
 
 # --- その他の定数（今後追加される可能性のあるもの）---
 

@@ -1,21 +1,23 @@
 from datetime import datetime
 from django.utils import timezone
-from rest_framework.views import APIView
-from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
+
 # --- コアモジュール ---
 from core.decorators.logging_process_with_sql import logging_process_with_sql
 from core.consts import LOG_METHOD
 from core.utils.log_helpers import log_output_by_msg_id
-from core.utils.date_format import convert_to_site_timezone, date_to_str
+from core.utils.date_format import convert_to_site_timezone
 from core.exceptions.exceptions import ApplicationError
+from core.views import BaseAPIView
+
 # --- アカウントモジュール ---
+from apps.account.serializer.account_withdraw import AccountWithdrawRequestSerializer, AccountWithdrawResponseSerializer
 from apps.account.services import AccountService
+
 
 KINO_ID = "account-withdraw"
 
-class AccountWithdrawView(APIView):
+class AccountWithdrawView(BaseAPIView):
     """
     退会処理APIクラス
     Create
@@ -24,7 +26,7 @@ class AccountWithdrawView(APIView):
     permission_classes = [IsAuthenticated]
     account_service = AccountService()
 
-    @logging_process_with_sql(KINO_ID)
+    @logging_process_with_sql
     def post(self, request, *args, **kwargs):
         """
         POSTリクエストを受け付ける。
@@ -62,13 +64,21 @@ class AccountWithdrawView(APIView):
         date_now: datetime = convert_to_site_timezone(timezone.now())
         # 1. 処理開始ログ出力(アプリケーションログ)
         log_output_by_msg_id(log_id="MSGI003", params=[KINO_ID, str(request.data)], logger_name=LOG_METHOD.APPLICATION.value)
-        # 2. ログイン(サービス実行)
-        self.account_service.account_withdraw(date_now, KINO_ID, request.user.id)
-        # 3. レスポンス作成
-        response_param = {
-            "executeAt": date_to_str(target_date=date_now, target_format="%Y/%m/%d %H:%M:%S"),
-        }
+        # 2. リクエストデータ検証
+        serializer = AccountWithdrawRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        # 3. アカウント退会(サービス実行)
+        self.account_service.account_withdraw(
+            date_now, 
+            KINO_ID, 
+            request.user.id
+        )
+        # 4. レスポンス作成（ここがポイント）
+        # 空であってもResponseSerializerを通す/「このAPIが何を返すか」がViewの最後を見れば一目でわかるようにする
+        # data=Noneまたは空辞書を渡すことで、executeAtだけが入ったレスポンスとなる
+        res_serializer = AccountWithdrawResponseSerializer({})
+        response = self.get_success_map_response(data=res_serializer.data)
         # 4. 処理終了ログ出力(アプリケーションログ)
-        log_output_by_msg_id(log_id="MSGI004", params=[KINO_ID, str(response_param)], logger_name=LOG_METHOD.APPLICATION.value)
+        log_output_by_msg_id(log_id="MSGI004", params=[KINO_ID, str(response.data)], logger_name=LOG_METHOD.APPLICATION.value)
         # 5. レスポンス返却
-        return Response(response_param, status=status.HTTP_200_OK)
+        return response

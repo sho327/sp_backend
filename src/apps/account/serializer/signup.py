@@ -1,11 +1,23 @@
 from rest_framework import serializers
 
-class SignupSerializer(serializers.Serializer):
+class SignupRequestSerializer(serializers.Serializer):
     """
-    新規登録APIのSerializerクラス
-    Create 
-        Author: Kato Shogo
+    入力：フロントエンドから送られてくるデータの検品
     """
+    email = serializers.EmailField(
+        required=True, 
+        help_text="メールアドレス"
+    )
+    password = serializers.CharField(
+        required=True, 
+        write_only=True, 
+        style={'input_type': 'password'},
+        min_length=8,
+        help_text="パスワード"
+    )
 
-    email = serializers.EmailField(required=True)
-    password = serializers.CharField(required=True)
+class SignupResponseSerializer(serializers.Serializer):
+    """
+    出力：フロントエンドへ返すデータの定義
+    """
+    pass

@@ -7,6 +7,7 @@ from django.db import models
 from django.db.models import Q, UniqueConstraint
 from simple_history.models import HistoricalRecords
 
+# --- 共通モジュール ---
 from core.models import BaseModel
 
 # SpotifyUserトークントラン

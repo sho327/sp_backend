@@ -1,14 +1,20 @@
 # coding: utf-8
-from django.urls import include, path
+from django.urls import path, include
 from rest_framework import routers
 
-from apps.playlist.views.model_t_playlist import Model_T_PlaylistViewSet
+# --- プレイリストモジュール ---
+from apps.playlist.views.playlist_list import PlaylistListView
+from apps.playlist.views.playlist_detail import PlaylistDetailView
+from apps.playlist.views.playlist_delete import PlaylistDeleteView
 
 app_name = "playlist"
 
 router = routers.DefaultRouter()
-router.register("model-t_playlist", Model_T_PlaylistViewSet, basename="model_t_playlist")
 
 urlpatterns = [
-    path("", include(router.urls)),
+    # ViewSet関連のURL(CRUD一括)
+    path('', include(router.urls)),
+    path('list/', PlaylistListView.as_view(), name='playlist_list'),
+    path('<uuid:playlist_id>/', PlaylistDetailView.as_view(), name='playlist_detail'),
+    path('<uuid:playlist_id>/delete/', PlaylistDeleteView.as_view(), name='playlist_delete'),
 ]

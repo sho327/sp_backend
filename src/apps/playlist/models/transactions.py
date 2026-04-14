@@ -3,16 +3,17 @@ import uuid
 from django.db import models
 from django.db.models import Q, UniqueConstraint
 
+# --- 共通モジュール ---
 from core.models import BaseModel
 
 
-# プレイリストトラン
+# プレイリストトラン
 class T_Playlist(BaseModel):
-    """ユーザーが作成したプレイリストの管理"""
+    """ユーザーが作成したプレイリストの管理"""
 
     # ---------- Consts ----------
     # ---------- Fields ----------
-    # ID(URLに使用される可能性もあるため、予測できないUUIDで保持する)
+    # ID(URLに使用される可能性もあるため、予測できないUUIDで保持する)
     id = models.UUIDField(
         db_column="id",
         verbose_name="ID",
@@ -21,14 +22,14 @@ class T_Playlist(BaseModel):
         default=uuid.uuid4,
         editable=False,
     )
-    # ユーザ(削除/物理削除の場合はCASCADE)
+    # ユーザ(削除/物理削除の場合はCASCADE)
     user = models.ForeignKey(
-        "account.M_User",  # 循環参照対策(文字で定義することで、後での紐付けとする)
+        "account.M_User",  # 循環参照対策(文字で定義することで、後での紐付けとする)
         db_column="user_id",
-        verbose_name="ユーザ",
-        db_comment="ユーザ",
+        verbose_name="ユーザ",
+        db_comment="ユーザ",
         on_delete=models.CASCADE,
-        # 逆参照名を定義(例: 「参照先インスタンス.[related_name]」/通常参照は「本インスタンス.参照先モデル名(_id)」で取得可能)
+        # 逆参照名を定義(例: 「参照先インスタンス.[related_name]」/通常参照は「本インスタンス.参照先モデル名(_id)」で取得可能)
         related_name="user_t_playlist_set",  # 役割_[複数形]ルール
     )
     # タイトル
@@ -49,30 +50,31 @@ class T_Playlist(BaseModel):
         blank=True,
         related_name="image_t_playlist_set",
     )
-    # アーティスト
+    # アーティスト(プレイリスト作成時のアーティスト登録情報)
     artists = models.ManyToManyField(
-        "artist.T_Artist",  # 循環参照対策(文字で定義することで、後での紐付けとする)
+        "artist.T_Artist",  # 循環参照対策(文字で定義することで、後での紐付けとする)
         verbose_name="アーティスト",
         db_comment="アーティスト",
-        # 逆参照名を定義(例: 「参照先インスタンス.[related_name]」/通常参照は「本インスタンス.参照先モデル名(_id)」で取得可能)
+        through="playlist.R_PlaylistArtist",  # 循環参照対策(文字で定義することで、後での紐付けとする)
+        # 逆参照名を定義(例: 「参照先インスタンス.[related_name]」/通常参照は「本インスタンス.参照先モデル名(_id)」で取得可能)
         related_name="artists_t_playlist_set",
     )
 
     # django-simple-historyを使用
     # history = HistoricalRecords()
 
-    # テーブル名
+    # テーブル名
     class Meta:
         db_table = "t_playlist"
-        db_table_comment = "プレイリストトラン"
-        verbose_name = "プレイリストトラン"
-        verbose_name_plural = "プレイリストトラン"
+        db_table_comment = "プレイリストトラン"
+        verbose_name = "プレイリストトラン"
+        verbose_name_plural = "プレイリストトラン"
         constraints = [
-            # 同一ユーザ内に同一アーティストが重複して登録されるのを防ぐ(論理削除考慮)
+            # 同一ユーザ内に同一アーティストが重複して登録されるのを防ぐ（論理削除考慮）
             # UniqueConstraint(
-            # fields=["user", "spotify_id"],
-            # condition=Q(deleted_at__isnull=True),
-            # name="unique_t_playlist_user_spotify_id_active",
+            #     fields=["user", "spotify_id"],
+            #     condition=Q(deleted_at__isnull=True),
+            #     name="unique_t_playlist_user_spotify_id_active",
             # ),
         ]
 
@@ -80,13 +82,13 @@ class T_Playlist(BaseModel):
         return f"{self.title}"
 
 
-# プレイリストトラックトラン
+# プレイリストトラックトラン
 class T_PlaylistTrack(BaseModel):
-    """ユーザーが作成したプレイリストの管理"""
+    """ユーザーが作成したプレイリストの管理"""
 
     # ---------- Consts ----------
     # ---------- Fields ----------
-    # ID(URLに使用される可能性もあるため、予測できないUUIDで保持する)
+    # ID(URLに使用される可能性もあるため、予測できないUUIDで保持する)
     id = models.UUIDField(
         db_column="id",
         verbose_name="ID",
@@ -95,12 +97,12 @@ class T_PlaylistTrack(BaseModel):
         default=uuid.uuid4,
         editable=False,
     )
-    # プレイリスト(削除/物理削除の場合はCASCADE)
+    # プレイリスト(削除/物理削除の場合はCASCADE)
     playlist = models.ForeignKey(
         "playlist.T_Playlist",
         db_column="playlist_id",
-        verbose_name="プレイリスト",
-        db_comment="プレイリスト",
+        verbose_name="プレイリスト",
+        db_comment="プレイリスト",
         on_delete=models.CASCADE,
         related_name="playlist_t_playlist_track_set",
     )
@@ -117,8 +119,8 @@ class T_PlaylistTrack(BaseModel):
         verbose_name="Spotify/ID",
         db_comment="Spotify/ID",
         max_length=255,
-        blank=True,
-        null=True,
+        # blank=True,
+        # null=True,
     )
     # アーティスト名
     artist_name = models.CharField(
@@ -133,6 +135,8 @@ class T_PlaylistTrack(BaseModel):
         verbose_name="アーティストSpotify/ID",
         db_comment="アーティストSpotify/ID",
         max_length=255,
+        # blank=True,
+        # null=True,
     )
     # アーティストSpotify画像(削除/物理削除の場合はCASCADE)
     artist_spotify_image = models.ForeignKey(
@@ -141,15 +145,15 @@ class T_PlaylistTrack(BaseModel):
         verbose_name="アーティストSpotify画像",
         db_comment="アーティストSpotify画像",
         on_delete=models.CASCADE,
-        related_name="artist_spotify_image_t_playlist_track_set",
+        related_name="artist_spotify_image_t_artist_set",
         null=True,
         blank=True,
     )
-    # アーティストジャンル
+    # アーティストジャンル
     artist_genres = models.JSONField(
         db_column="artist_genres",
-        verbose_name="アーティストジャンル",
-        db_comment="アーティストジャンル",
+        verbose_name="アーティストジャンル",
+        db_comment="アーティストジャンル",
         default=list,
         blank=True,
     )
@@ -157,14 +161,14 @@ class T_PlaylistTrack(BaseModel):
     # django-simple-historyを使用
     # history = HistoricalRecords()
 
-    # テーブル名
+    # テーブル名
     class Meta:
         db_table = "t_playlist_track"
-        db_table_comment = "プレイリストトラックトラン"
-        verbose_name = "プレイリストトラックトラン"
-        verbose_name_plural = "プレイリストトラックトラン"
+        db_table_comment = "プレイリストトラックトラン"
+        verbose_name = "プレイリストトラックトラン"
+        verbose_name_plural = "プレイリストトラックトラン"
         constraints = [
-            # 同一プレイリスト内で同一Spotify IDが重複しないようにする(論理削除考慮)
+            # 同一プレイリスト内で同一SpotifyID(曲ID)が重複しないようにする(論理削除考慮)
             UniqueConstraint(
                 fields=["playlist", "spotify_id"],
                 condition=Q(deleted_at__isnull=True),

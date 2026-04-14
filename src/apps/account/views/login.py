@@ -2,23 +2,24 @@ from datetime import datetime
 from django.utils import timezone
 from django.db import transaction
 from django.utils.decorators import method_decorator
-from rest_framework.views import APIView
-from rest_framework import status
 from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
+
 # --- コアモジュール ---
 from core.decorators.logging_process_with_sql import logging_process_with_sql
 from core.consts import LOG_METHOD
 from core.utils.log_helpers import log_output_by_msg_id
-from core.utils.date_format import convert_to_site_timezone, date_to_str
+from core.utils.date_format import convert_to_site_timezone
 from core.exceptions.exceptions import ApplicationError
+from core.views import BaseAPIView
+
 # --- アカウントモジュール ---
-from apps.account.serializer.login import LoginSerializer
+from apps.account.serializer.login import LoginRequestSerializer, LoginResponseSerializer
 from apps.account.services import AccountService
+
 
 KINO_ID = "login"
 
-class LoginView(APIView):
+class LoginView(BaseAPIView):
     """
     ログイン処理APIクラス
     Create
@@ -32,7 +33,7 @@ class LoginView(APIView):
     def dispatch(self, *args, **kwargs):
         return super().dispatch(*args, **kwargs)
 
-    @logging_process_with_sql(KINO_ID)
+    @logging_process_with_sql
     def post(self, request, *args, **kwargs):
         """
         POSTリクエストを受け付ける。
@@ -71,17 +72,11 @@ class LoginView(APIView):
         # 1. 処理開始ログ出力(アプリケーションログ)
         log_output_by_msg_id(log_id="MSGI003", params=[KINO_ID, str(request.data)], logger_name=LOG_METHOD.APPLICATION.value)
         # 2. リクエストデータ検証
-        login_serializer = LoginSerializer(data=request.data)
+        login_serializer = LoginRequestSerializer(data=request.data)
         login_serializer.is_valid(raise_exception=True)
-        # IPアドレスの取得 (プロキシ考慮)
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            ip_address = x_forwarded_for.split(',')[0].strip()
-        else:
-            ip_address = request.META.get('REMOTE_ADDR')
-        # User-Agentの取得
-        user_agent = request.META.get('HTTP_USER_AGENT', '')
         # 3. ログイン(サービス実行)
+        ip_address = self._get_client_ip(request)
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
         result = self.account_service.login(
             date_now=date_now,
             kino_id=KINO_ID,
@@ -89,24 +84,31 @@ class LoginView(APIView):
             user_agent=user_agent,
             **login_serializer.validated_data
         )
-        response_param = {
-            "access_token": str(result["access_token"]),
-            "executeAt": date_to_str(target_date=date_now, target_format="%Y/%m/%d %H:%M:%S"),
-        }
         # 4. レスポンス作成(HttpOnlyCookieへのリフレッシュトークン情報の保存)
-        res = Response(response_param, status=status.HTTP_200_OK)
+        res_serializer = LoginResponseSerializer(data={
+            "access_token": str(result["access_token"]),
+        })
+        res_serializer.is_valid(raise_exception=True)
+        response = self.get_success_map_response(res_serializer.data)
+        # 5. Cookie設定(HttpOnlyCookieへのリフレッシュトークン情報の保存)
         try:
-            res.delete_cookie("refresh_token")
+            response.delete_cookie("refresh_token")
         except Exception as e:
             pass
         # HttpOnlyのCookieヘッダーにTokenのセットを行う
-        res.set_cookie(
+        response.set_cookie(
             "refresh_token",
             str(result["refresh_token"]),
             max_age=60 * 60 * 24 * 30,
             httponly=True,
         )
-        # 5. 処理終了ログ出力(アプリケーションログ)
-        log_output_by_msg_id(log_id="MSGI004", params=[KINO_ID, str(response_param)], logger_name=LOG_METHOD.APPLICATION.value)
-        # 6. レスポンス返却
-        return Response(response_param, status=status.HTTP_200_OK)
+        # 6. 処理終了ログ出力(アプリケーションログ)
+        log_output_by_msg_id(log_id="MSGI004", params=[KINO_ID, str(response.data)], logger_name=LOG_METHOD.APPLICATION.value)
+        # 7. レスポンス返却
+        return response
+    
+    def _get_client_ip(self, request):
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            return x_forwarded_for.split(',')[0].strip()
+        return request.META.get('REMOTE_ADDR')

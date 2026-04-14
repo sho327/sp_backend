@@ -3,6 +3,7 @@ import uuid
 from django.db import models
 from django.db.models import Q, UniqueConstraint
 from simple_history.models import HistoricalRecords
+
 # --- コアモジュール ---
 from core.models import BaseModel
 
@@ -22,7 +23,7 @@ class T_Artist(BaseModel):
     )
     # ユーザ(削除/物理削除の場合はCASCADE)
     user = models.ForeignKey(
-        "account.T_Profile",  # 循環参照対策(文字で定義することで、後での紐付けとする)
+        "account.M_User",  # 循環参照対策(文字で定義することで、後での紐付けとする)
         db_column="user_id",
         verbose_name="ユーザ",
         db_comment="ユーザ",
