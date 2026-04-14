@@ -28,8 +28,10 @@ from apps.playlist.exceptions import (
 # --- プレイリストモジュール ---
 from apps.playlist.models import R_PlaylistArtist, T_Playlist, T_PlaylistTrack
 
-# --- コアモジュール ---
+# --- コアモジュール ---
+from core.consts import LOG_METHOD
 from core.utils.common import dedupe_keep_order, take
+from core.utils.log_helpers import log_output_by_msg_id
 
 
 class PlaylistService:
@@ -133,21 +135,22 @@ class PlaylistService:
 
         # 2. 初期トラックの登録（もしリクエストに含まれる場合）
         # tracks_data = [{"name": "Song A", "spotify_id": "xxx", "artist": <instance>}, ...]
-        # tracks_data = validated_data.get('tracks', [])
-        # if tracks_data:
-        #     track_instances = [
-        #         T_PlaylistTrack(
-        #             playlist=playlist,
-        #             name=track.get('name'),
-        #             spotify_id=track.get('spotify_id'),
-        #             artist=track.get('artist'), # T_Artistインスタンス
-        #             created_by=user,
-        #             created_method=kino_id,
-        #             updated_by=user,
-        #             updated_method=kino_id
-        #         ) for track in tracks_data
-        #     ]
-        #     T_PlaylistTrack.objects.bulk_create(track_instances)
+        tracks_data = validated_data.get("tracks", [])
+        if tracks_data:
+            track_instances = [
+                T_PlaylistTrack(
+                    playlist=playlist,
+                    name=track.get("name"),
+                    spotify_id=track.get("spotify_id"),
+                    artist=track.get("artist"),  # T_Artistインスタンス
+                    created_by=user,
+                    created_method=kino_id,
+                    updated_by=user,
+                    updated_method=kino_id,
+                )
+                for track in tracks_data
+            ]
+            T_PlaylistTrack.objects.bulk_create(track_instances)
 
         return playlist
 
@@ -434,10 +437,83 @@ class PlaylistService:
     # プレイリスト生成※SpotifyAPI使用
     def generate_playlist_tracks(
         self, date_now: datetime, kino_id: str, user: M_User, validated_data: dict
-    ) -> T_Playlist:
-        """プレイリストを生成する"""
-        # 1. プレイリストの作成
-        playlist = self.create_playlist(date_now, kino_id, user, validated_data)
+    ) -> List[dict]:
+        """各種パターンに基づいてトラックデータを生成する"""
+        # 1. パラメータを抽出
+        pattern = validated_data.get("pattern", "top_tracks")
+        track_count = validated_data.get("get_tracks_count", 5)
+        artist_instances = validated_data.get("artist_ids", [])  # T_Artistのリスト
 
-        # 2. パラメータを抽出
-        generate_pattern = validated_data["popular_tracks_count"]
+        all_tracks_data = []
+
+        for artist in artist_instances:
+            artist_tracks = []
+
+            # A. 人気順(top_tracks)
+            if pattern == "top_tracks":
+                tracks = self.spotify_service.fetch_get_artist_top_tracks(
+                    artist.spotify_id, limit=track_count
+                )
+                for t in tracks:
+                    artist_tracks.append(
+                        {
+                            "name": t.get("name"),
+                            "spotify_id": t.get("id"),
+                            "artist": artist,
+                        }
+                    )
+
+            # B. 最近のセトリ(set_list)
+            elif pattern == "set_list":
+                song_names = self.setlist_service.get_latest_setlist_song_names(
+                    artist.name
+                )
+                if not song_names:
+                    # 見つからなければワーニングログ
+                    log_output_by_msg_id(
+                        log_id="MSGW001",
+                        params=[f"対象アーティスト({artist.name})の直近のセトリは0件"],
+                        logger_name=LOG_METHOD.APPLICATION.value,
+                    )
+                else:
+                    # 曲名でSpotify検索
+                    for name in song_names[:track_count]:
+                        query = f"track:{name} artist:{artist.name}"
+                        search_results = self.spotify_service.fetch_search_tracks(
+                            query, limit=1
+                        )
+                        if search_results:
+                            t = search_results[0]
+                            artist_tracks.append(
+                                {
+                                    "name": t.get("name"),
+                                    "spotify_id": t.get("id"),
+                                    "artist": artist,
+                                }
+                            )
+
+            # C. ムードフィルター(moodfilter)
+            elif pattern == "moodfilter":
+                # mood_brightness -> valence, mood_intensity -> energy
+                target_valence = validated_data.get("mood_brightness", 50) / 100.0
+                target_energy = validated_data.get("mood_intensity", 50) / 100.0
+
+                tracks = self.spotify_service.fetch_get_recommendations(
+                    seed_artists=[artist.spotify_id],
+                    limit=track_count,
+                    target_valence=target_valence,
+                    target_energy=target_energy,
+                )
+                for t in tracks:
+                    artist_tracks.append(
+                        {
+                            "name": t.get("name"),
+                            "spotify_id": t.get("id"),
+                            "artist": artist,
+                        }
+                    )
+
+            # アーティストごとの曲を追加
+            all_tracks_data.extend(artist_tracks)
+
+        return all_tracks_data

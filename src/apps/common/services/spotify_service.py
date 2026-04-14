@@ -214,7 +214,7 @@ class SpotifyService:
     # 特定のアーティストに紐づく人気曲データ取得
     def fetch_get_artist_top_tracks(self, spotify_id, limit=5):
         results = self._call_api(self.sp.artist_top_tracks, spotify_id)
-        return [track['uri'] for track in results.get('tracks', [])[:limit]]
+        return results.get("tracks", [])[:limit]
     
     # アーティスト検索
     def fetch_search_artists(self, query, limit=20):
@@ -261,14 +261,16 @@ class SpotifyService:
         return []
 
     # レコメンデーション取得 (お勧め楽曲)
-    def fetch_get_recommendations(self, seed_artists=None, seed_genres=None, seed_tracks=None, limit=20):
+    def fetch_get_recommendations(
+        self, seed_artists=None, seed_genres=None, seed_tracks=None, limit=20, **kwargs
+    ):
         """
         指定されたシード(アーティスト、ジャンル、トラック)に基づきお勧め楽曲を取得
         ※seedは合計で最大5つまで指定可能
         """
         try:
             val = int(limit or 20)
-            safe_limit = min(max(val, 1), 100) # レコメンデーションは最大100まで可能
+            safe_limit = min(max(val, 1), 100)  # レコメンデーションは最大100まで可能
         except (ValueError, TypeError):
             safe_limit = 20
 
@@ -277,9 +279,10 @@ class SpotifyService:
             seed_artists=seed_artists,
             seed_genres=seed_genres,
             seed_tracks=seed_tracks,
-            limit=safe_limit
+            limit=safe_limit,
+            **kwargs,
         )
-        return results.get('tracks', [])
+        return results.get("tracks", [])
     
     # ------------------------------------------------------------------
     # その他メソッド
