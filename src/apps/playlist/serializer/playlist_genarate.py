@@ -39,3 +39,14 @@ class PlaylistGenerateRequestSerializer(serializers.Serializer):
         max_value=5,
         default=0,
     )
+
+
+class PlaylistTrackGenerateResponseSerializer(serializers.Serializer):
+    """
+    出力：生成された楽曲データの返却用
+    """
+
+    name = serializers.CharField()
+    spotify_id = serializers.CharField()
+    artist_name = serializers.CharField(source="artist.name")
+    artist_id = serializers.UUIDField(source="artist.id")
