@@ -16,15 +16,16 @@ class ArtistBaseSerializer(serializers.ModelSerializer):
 class ArtistMiniResponseSerializer(ArtistBaseSerializer):
     """
     【最小構成】一覧用
-    一覧で必要な項目（画像URLなど）だけを抽出。
+    一覧で必要な項目(画像URLなど)だけを抽出。
     """
     # 外部キー対象のURLだけ取得させる
     # source='spotify_image.url' とすることで、
     # 階層を下げずに image_url というキーで直接文字列を返せる
     image_url = serializers.ReadOnlyField(source='spotify_image.url')
+    tags = MasterArtistTagMiniResponseSerializer(many=True, read_only=True)
 
     class Meta(ArtistBaseSerializer.Meta):
-        fields = ['id', 'name', 'spotify_id', 'image_url']
+        fields = ['id', 'name', 'name_en', 'spotify_id', 'image_url', 'tags']
 
 class ArtistFullResponseSerializer(ArtistBaseSerializer):
     """

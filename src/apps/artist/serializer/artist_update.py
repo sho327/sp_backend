@@ -8,6 +8,7 @@ class ArtistUpdateRequestSerializer(serializers.Serializer):
     入力：フロントエンドから送られてくるデータの検品
     """
     # 更新可能な項目のみ定義(すべて任意項目にすることでPATCHに対応)
+    setlistfm_mbid = serializers.CharField(required=False, allow_null=True)
 
     # ※PrimaryKeyRelatedFieldを利用
     # serializers.PrimaryKeyRelatedFieldのqueryset にフィルタをかけている場合、

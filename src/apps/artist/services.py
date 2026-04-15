@@ -4,6 +4,7 @@ from django.utils import timezone
 # --- 共通モジュール ---
 from apps.common.models import T_FileResource
 from apps.common.services.spotify_service import SpotifyService
+from apps.common.services.storage_service import StorageService
 
 # --- アカウントモジュール ---
 from apps.account.models import M_User
@@ -19,9 +20,10 @@ class ArtistService:
     """
     def __init__(self):
         self.spotify_service = SpotifyService()
+        self.storage_service = StorageService()
     
     def _update_spotify_image(self, date_now: datetime, kino_id: str, user: M_User, artist: T_Artist, latest_data):
-        """画像URLの比較とT_FileResourceの作成・紐付けを行う共通ロジック"""
+        """画像URLの比較とT_FileResourceの作成/紐付けを行う共通ロジック"""
         images = latest_data.get('images', [])
         if not images:
             return
@@ -101,7 +103,14 @@ class ArtistService:
     # アーティスト登録
     def create_artist(self, date_now: datetime, kino_id: str, user: M_User, validated_data):
         """アーティストを新規登録する"""
-        # 1. 重複チェック（論理削除されていない同一SpotifyIDがないか）
+        # 1. 画像の保存
+        storage_path = self.storage_service.upload_file(
+            file_data=validated_data['image'].file,
+            folder_path="artists",
+            original_filename=validated_data['image'].name,
+        )
+
+        # 2. 重複チェック(論理削除されていない同一SpotifyIDがないか)
         if T_Artist.objects.filter(
             user=user, 
             spotify_id=validated_data['spotify_id'], 
@@ -112,7 +121,7 @@ class ArtistService:
         # 関連マスタの存在チェック
         # ※コンテキスト、タグに関してはシリアライザ(PrimaryKeyRelatedField)にて存在チェック済みのため不要
 
-        # 2. 画像リソース(T_FileResource)の作成
+        # 3. 画像リソース(T_FileResource)の作成
         spotify_image = None
         if validated_data.get('image_url'):
             spotify_image = T_FileResource.objects.create(
@@ -125,7 +134,7 @@ class ArtistService:
                 updated_method=kino_id,
             )
         
-        # 3. アーティスト本体の作成
+        # 4. アーティスト本体の作成
         artist = T_Artist.objects.create(
             user=user,
             spotify_id=validated_data['spotify_id'],
@@ -173,9 +182,31 @@ class ArtistService:
         except T_Artist.DoesNotExist:
             raise ArtistNotFoundError()
         
+        # 1. 画像の保存
+        if 'image' in validated_data:
+            storage_path = self.storage_service.upload_file(
+                file_data=validated_data['image'].file,
+                folder_path="artists",
+                original_filename=validated_data['image'].name,
+            )
+            self.delete_file(artist.spotify_image.storage_path)
+            artist.spotify_image = T_FileResource.objects.create(
+                file_type=T_FileResource.FileType.IMAGE,
+                storage_path=storage_path,
+                file_name=f"spotify_{validated_data['name']}_image",
+                created_by=user,
+                created_method=kino_id,
+                updated_by=user,
+                updated_method=kino_id,
+            )
+
         # 2. コンテキストの更新
         if 'context_id' in validated_data: # validated_dataに含まれているときのみ更新
             artist.context = validated_data['context_id']
+        
+        # 3. SetlistFmIdの更新
+        if 'setlistfm_id' in validated_data: # validated_dataに含まれているときのみ更新
+            artist.setlistfm_id = validated_data['setlistfm_id']
         
         artist.updated_method = kino_id
         artist.updated_by = user

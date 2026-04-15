@@ -9,7 +9,10 @@ class ArtistCreateRequestSerializer(serializers.Serializer):
     """
     spotify_id = serializers.CharField(required=True)
     name = serializers.CharField(required=True)
+    name_en = serializers.CharField(required=False, allow_null=True)
     image_url = serializers.URLField(required=False, allow_null=True)
+    setlistfm_mbid = serializers.CharField(required=False, allow_null=True)
+    is_setlistfm_active = serializers.BooleanField(required=False, allow_null=True)
     # ※PrimaryKeyRelatedFieldを利用
     # serializers.PrimaryKeyRelatedFieldのqueryset にフィルタをかけている場合、
     # DRFはバリデーション時(is_valid()実行時)に以下の挙動を行う

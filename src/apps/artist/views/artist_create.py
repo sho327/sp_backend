@@ -1,6 +1,7 @@
 from datetime import datetime
 from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
 
 # --- コアモジュール ---
 from core.decorators.logging_process_with_sql import logging_process_with_sql
@@ -25,6 +26,7 @@ class ArtistCreateView(BaseAPIView):
     """
     permission_classes = [IsAuthenticated]
     artist_service = ArtistService()
+    parser_classes = [MultiPartParser, FormParser]
 
     @logging_process_with_sql
     def post(self, request, *args, **kwargs):
