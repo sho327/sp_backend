@@ -106,53 +106,68 @@ class PlaylistService:
         self, date_now: datetime, kino_id: str, user: M_User, validated_data: dict
     ) -> T_Playlist:
         """プレイリストを新規登録する"""
-        # 1. プレイリストの作成
-        playlist = T_Playlist.objects.create(
-            user=user,
-            title=validated_data["title"],
-            image=validated_data.get("image"),  # FileResourceインスタンス
-            created_by=user,
-            created_method=kino_id,
-            updated_by=user,
-            updated_method=kino_id,
+        # 1. 画像の保存
+        storage_path = None
+        if validated_data.get('image'):
+            storage_path = self.storage_service.upload_file(
+                file_data=validated_data['image'].file,
+                folder_path="artists",
+                original_filename=validated_data['image'].name,
         )
 
-        # 3. アーティストとの紐付け(ManyToMany/R_PlaylistArtist)
-        artists = validated_data.get("artists", [])
-        if artists:
-            relations = [
-                R_PlaylistArtist(
-                    playlist=playlist,
-                    artist=artist,
-                    created_by=user,
-                    created_method=kino_id,
-                    updated_by=user,
-                    updated_method=kino_id,
-                )
-                for artist in artists
-            ]
-            R_PlaylistArtist.objects.bulk_create(relations)
+        try:
+            # 2. プレイリストの作成
+            playlist = T_Playlist.objects.create(
+                user=user,
+                title=validated_data["title"],
+                image=validated_data.get("image"),  # FileResourceインスタンス
+                created_by=user,
+                created_method=kino_id,
+                updated_by=user,
+                updated_method=kino_id,
+            )
 
-        # 2. 初期トラックの登録（もしリクエストに含まれる場合）
-        # tracks_data = [{"name": "Song A", "spotify_id": "xxx", "artist": <instance>}, ...]
-        tracks_data = validated_data.get("tracks", [])
-        if tracks_data:
-            track_instances = [
-                T_PlaylistTrack(
-                    playlist=playlist,
-                    name=track.get("name"),
-                    spotify_id=track.get("spotify_id"),
-                    artist=track.get("artist"),  # T_Artistインスタンス
-                    created_by=user,
-                    created_method=kino_id,
-                    updated_by=user,
-                    updated_method=kino_id,
-                )
-                for track in tracks_data
-            ]
-            T_PlaylistTrack.objects.bulk_create(track_instances)
+            # 3. アーティストとの紐付け(ManyToMany/R_PlaylistArtist)
+            artists = validated_data.get("artists", [])
+            if artists:
+                relations = [
+                    R_PlaylistArtist(
+                        playlist=playlist,
+                        artist=artist,
+                        created_by=user,
+                        created_method=kino_id,
+                        updated_by=user,
+                        updated_method=kino_id,
+                    )
+                    for artist in artists
+                ]
+                R_PlaylistArtist.objects.bulk_create(relations)
 
-        return playlist
+            # 4. 初期トラックの登録（もしリクエストに含まれる場合）
+            # tracks_data = [{"name": "Song A", "spotify_id": "xxx", "artist": <instance>}, ...]
+            tracks_data = validated_data.get("tracks", [])
+            if tracks_data:
+                track_instances = [
+                    T_PlaylistTrack(
+                        playlist=playlist,
+                        name=track.get("name"),
+                        spotify_id=track.get("spotify_id"),
+                        artist=track.get("artist"),  # T_Artistインスタンス
+                        created_by=user,
+                        created_method=kino_id,
+                        updated_by=user,
+                        updated_method=kino_id,
+                    )
+                    for track in tracks_data
+                ]
+                T_PlaylistTrack.objects.bulk_create(track_instances)
+
+            return playlist
+        except Exception as e:
+            # 保存した画像を削除
+            if storage_path:
+                self.storage_service.delete_file(storage_path)
+            raise e
 
     # ------------------------------------------------------------------
     # 更新系サービス
@@ -174,37 +189,73 @@ class PlaylistService:
             )
         except T_Playlist.DoesNotExist:
             raise PlaylistNotFoundError()
+        
+        # 2. 画像の保存
+        storage_path = None
+        if 'image' in validated_data:
+            storage_path = self.storage_service.upload_file(
+                file_data=validated_data['image'].file,
+                folder_path="artists",
+                original_filename=validated_data['image'].name,
+            )
+        
+        # 3. 画像の削除対象ファイルパスの退避
+        old_storage_path = None
+        if 'image' in validated_data and playlist.image:
+            old_storage_path = playlist.image.storage_path
+        
+        try:
+            # 4. 画像の更新
+            if storage_path:
+                playlist.image = T_FileResource.objects.create(
+                    file_type=T_FileResource.FileType.IMAGE,
+                    storage_path=storage_path,
+                    file_name=f"playlist_{validated_data['title']}_image",
+                    created_by=user,
+                    created_method=kino_id,
+                    updated_by=user,
+                    updated_method=kino_id,
+                )
+            
+            # 5. タイトルの更新
+            if "title" in validated_data:  # validated_dataに含まれているときのみ更新
+                playlist.title = validated_data["title"]
 
-        # 2. タイトルの更新
-        if "title" in validated_data:  # validated_dataに含まれているときのみ更新
-            playlist.title = validated_data["title"]
+            playlist.updated_method = kino_id
+            playlist.updated_by = user
+            playlist.save()
 
-        playlist.updated_method = kino_id
-        playlist.updated_by = user
-        playlist.save()
+            # 6. アーティスト紐付けの更新(洗替方式)
+            if "artist_ids" in validated_data:  # validated_dataに含まれているときのみ更新
+                # 中間テーブルR_PlaylistArtistを物理削除
+                R_PlaylistArtist.objects.filter(playlist=playlist).delete()
 
-        # 3. アーティスト紐付けの更新(洗替方式)
-        if "artist_ids" in validated_data:  # validated_dataに含まれているときのみ更新
-            # 中間テーブルR_PlaylistArtistを物理削除
-            R_PlaylistArtist.objects.filter(playlist=playlist).delete()
+                new_artists = validated_data["artist_ids"]  # T_Artistインスタンスのリスト
+                if new_artists:
+                    # bulk_create 用のリスト作成
+                    relations = [
+                        R_PlaylistArtist(
+                            playlist=playlist,
+                            artist=artist,
+                            created_by=user,
+                            created_method=kino_id,
+                            updated_by=user,
+                            updated_method=kino_id,
+                        )
+                        for artist in new_artists
+                    ]
+                    R_PlaylistArtist.objects.bulk_create(relations)
+            
+            # 7. 画像の削除
+            if old_storage_path:
+                self.storage_service.delete_file(old_storage_path)
 
-            new_artists = validated_data["artist_ids"]  # T_Artistインスタンスのリスト
-            if new_artists:
-                # bulk_create 用のリスト作成
-                relations = [
-                    R_PlaylistArtist(
-                        playlist=playlist,
-                        artist=artist,
-                        created_by=user,
-                        created_method=kino_id,
-                        updated_by=user,
-                        updated_method=kino_id,
-                    )
-                    for artist in new_artists
-                ]
-                R_PlaylistArtist.objects.bulk_create(relations)
-
-        return playlist
+            return playlist
+        except Exception as e:
+            # 保存した画像を削除
+            if storage_path:
+                self.storage_service.delete_file(storage_path)
+            raise e
 
     # ------------------------------------------------------------------
     # 削除系サービス
@@ -242,6 +293,10 @@ class PlaylistService:
             updated_method=kino_id,
             deleted_at=date_now,
         )
+
+        # 画像の削除
+        if playlist.image:
+            self.storage_service.delete_file(playlist.image.storage_path)
 
     # ------------------------------------------------------------------
     # その他サービス
