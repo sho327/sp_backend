@@ -108,12 +108,12 @@ class PlaylistService:
         """プレイリストを新規登録する"""
         # 1. 画像の保存
         storage_path = None
-        if validated_data.get('image'):
+        if validated_data.get("image"):
             storage_path = self.storage_service.upload_file(
-                file_data=validated_data['image'].file,
+                file_data=validated_data["image"].file,
                 folder_path="artists",
-                original_filename=validated_data['image'].name,
-        )
+                original_filename=validated_data["image"].name,
+            )
 
         try:
             # 2. プレイリストの作成
@@ -189,21 +189,21 @@ class PlaylistService:
             )
         except T_Playlist.DoesNotExist:
             raise PlaylistNotFoundError()
-        
+
         # 2. 画像の保存
         storage_path = None
-        if 'image' in validated_data:
+        if "image" in validated_data:
             storage_path = self.storage_service.upload_file(
-                file_data=validated_data['image'].file,
+                file_data=validated_data["image"].file,
                 folder_path="artists",
-                original_filename=validated_data['image'].name,
+                original_filename=validated_data["image"].name,
             )
-        
+
         # 3. 画像の削除対象ファイルパスの退避
         old_storage_path = None
-        if 'image' in validated_data and playlist.image:
+        if "image" in validated_data and playlist.image:
             old_storage_path = playlist.image.storage_path
-        
+
         try:
             # 4. 画像の更新
             if storage_path:
@@ -216,7 +216,7 @@ class PlaylistService:
                     updated_by=user,
                     updated_method=kino_id,
                 )
-            
+
             # 5. タイトルの更新
             if "title" in validated_data:  # validated_dataに含まれているときのみ更新
                 playlist.title = validated_data["title"]
@@ -226,11 +226,15 @@ class PlaylistService:
             playlist.save()
 
             # 6. アーティスト紐付けの更新(洗替方式)
-            if "artist_ids" in validated_data:  # validated_dataに含まれているときのみ更新
+            if (
+                "artist_ids" in validated_data
+            ):  # validated_dataに含まれているときのみ更新
                 # 中間テーブルR_PlaylistArtistを物理削除
                 R_PlaylistArtist.objects.filter(playlist=playlist).delete()
 
-                new_artists = validated_data["artist_ids"]  # T_Artistインスタンスのリスト
+                new_artists = validated_data[
+                    "artist_ids"
+                ]  # T_Artistインスタンスのリスト
                 if new_artists:
                     # bulk_create 用のリスト作成
                     relations = [
@@ -245,7 +249,7 @@ class PlaylistService:
                         for artist in new_artists
                     ]
                     R_PlaylistArtist.objects.bulk_create(relations)
-            
+
             # 7. 画像の削除
             if old_storage_path:
                 self.storage_service.delete_file(old_storage_path)
@@ -376,71 +380,6 @@ class PlaylistService:
         playlist_instance.save()
 
         return playlist_instance
-
-    # プレイリスト情報最新化(要: playlist_instance)※SpotifyAPI使用
-    # def refresh_playlist_tracks(self, date_now: datetime, kino_id: str, user: M_User, playlist_instance: T_Playlist):
-    #     """
-    #     プレイリスト内の各トラックが持つ spotify_id を基に、
-    #     Spotifyから最新の楽曲情報を取得してDBを更新する
-    #     """
-    #     # 1. 現在のプレイリストに含まれるトラック(spotify_idを持つもの)を取得
-    #     current_tracks = playlist_instance.playlist_t_playlist_track_set.filter(
-    #         deleted_at__isnull=True
-    #     ).exclude(spotify_id__isnull=True).exclude(spotify_id="")
-    #     if not current_tracks.exists():
-    #         return playlist_instance
-
-    #     # 2. Spotify IDの一覧を作成
-    #     spotify_ids = list(current_tracks.values_list('spotify_id', flat=True))
-
-    #     # 3. Spotify APIで楽曲情報を一括取得(fetch_get_tracksは内部でsp.tracksを使用)
-    #     # ※一度に取得できる上限(通常50件)があるため、Service側で調整されている前提
-    #     latest_tracks_data = self.spotify_service.fetch_get_tracks(spotify_ids)
-
-    #     # 4. 取得データをマッピング(SpotifyIDをキーにした辞書)
-    #     latest_map = {track['id']: track for track in latest_tracks_data if track}
-
-    #     # 5. 最新データに含まれる全アーティストIDを抽出した上でDB検索(N+1対策)
-    #     new_artist_spotify_ids = set()
-    #     for track_info in latest_tracks_data:
-    #         if track_info and track_info.get('artists'):
-    #             # 最初のアーティストをメインとして扱う
-    #             new_artist_spotify_ids.add(track_info['artists'][0]['id'])
-
-    #     # 自社DBに存在するアーティストを辞書化 {spotify_id: T_Artistインスタンス}
-    #     registered_artists_map = {
-    #         a.spotify_id: a for a in T_Artist.objects.filter(
-    #             user=user,
-    #             spotify_id__in=new_artist_spotify_ids,
-    #             deleted_at__isnull=True
-    #         )
-    #     }
-
-    #     # 6. DBの各レコードを最新データで更新
-    #     for db_track in current_tracks:
-    #         latest = latest_map.get(db_track.spotify_id)
-    #         if not latest:
-    #             continue
-
-    #         # 名前や最新の情報を上書き
-    #         db_track.name = latest.get('name', db_track.name)
-
-    #         if latest.get('artists'):
-    #             spotify_artist_id = latest['artists'][0]['id']
-    #             # 自社DBに存在すればセット(いなければNoneまたは現状維持)
-    #             if spotify_artist_id in registered_artists_map:
-    #                 db_track.artist = registered_artists_map[spotify_artist_id]
-
-    #         db_track.updated_by = user
-    #         db_track.updated_method = kino_id
-    #         db_track.save()
-
-    #     # 6. プレイリスト本体の更新
-    #     playlist_instance.updated_by = user
-    #     playlist_instance.updated_method = kino_id
-    #     playlist_instance.save()
-
-    #     return playlist_instance
 
     # プレイリスト情報最新化(要: playlist_track_instance)※SpotifyAPI使用
     def refresh_playlist_track(
