@@ -4,11 +4,10 @@ from django.utils import timezone
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 
+from apps.playlist.serializer.playlist_base import PlaylistMiniResponseSerializer
+
 # --- プレイリストモジュール ---
-from apps.playlist.serializer.playlist_genarate import (
-    PlaylistGenerateRequestSerializer,
-    PlaylistTrackGenerateResponseSerializer,
-)
+from apps.playlist.serializer.playlist_update import PlaylistUpdateRequestSerializer
 from apps.playlist.services import PlaylistService
 
 # --- コアモジュール ---
@@ -17,16 +16,17 @@ from core.exceptions.exceptions import ApplicationError
 from core.utils.date_format import convert_to_site_timezone
 from core.views import BaseAPIView
 
-KINO_ID = "playlist-generate"
+KINO_ID = "playlist-update"
 
 
-class PlaylistGenerateView(BaseAPIView):
+class PlaylistUpdateView(BaseAPIView):
     """
-    プレイリスト楽曲生成APIクラス
+    プレイリスト更新APIクラス
     """
 
     permission_classes = [IsAuthenticated]
     playlist_service = PlaylistService()
+    parser_classes = [MultiPartParser, FormParser]
 
     @logging_process_with_sql
     def post(self, request, *args, **kwargs):
@@ -38,32 +38,23 @@ class PlaylistGenerateView(BaseAPIView):
             date_now: datetime = convert_to_site_timezone(timezone.now())
 
             # 1. バリデーション
-            serializer = PlaylistGenerateRequestSerializer(data=request.data)
+            serializer = PlaylistUpdateRequestSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
 
-            # 2. サービス実行（楽曲生成）
-            # 注意: generate_playlist_tracks は List[dict] を返すように修正済み
-            tracks_data = self.playlist_service.generate_playlist_tracks(
+            # 2. サービス実行(プレイリスト更新)
+            validated_data = serializer.validated_data
+            playlist = self.playlist_service.create_playlist(
                 date_now=date_now,
                 kino_id=KINO_ID,
                 user=request.user,
-                validated_data=serializer.validated_data,
+                validated_data=validated_data,
             )
 
             # 3. レスポンス作成
-            # 生成された楽曲データをシリアライズ
-            res_tracks_serializer = PlaylistTrackGenerateResponseSerializer(
-                tracks_data, many=True
-            )
-
-            # レスポンスデータ構築
-            response_data = {
-                "title": serializer.validated_data.get("title"),
-                "tracks": res_tracks_serializer.data,
-            }
+            res_serializer = PlaylistMiniResponseSerializer(playlist)
 
             # 成功レスポンス返却
-            return self.get_success_map_response(response_data)
+            return self.get_success_map_response(res_serializer.data)
 
         except ApplicationError:
             raise

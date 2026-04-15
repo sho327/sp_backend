@@ -374,7 +374,6 @@ class ArtistService:
                 {
                     "spotify_id": item["id"],
                     "name": item["name"],
-                    "name_en": item["name"],
                     # 画像URLの階層をフロントが扱いやすいようにフラットにする
                     "image_url": item["images"][0]["url"] if item["images"] else None,
                     "genres": item.get("genres", []),
