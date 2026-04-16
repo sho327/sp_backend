@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 from django.db import IntegrityError, transaction
 
-# --- アカウントモジュール ---
+# --- アカウントモジュール ---
 from apps.account.models import M_User
 
 # --- アーティストモジュール ---
@@ -28,7 +28,7 @@ from apps.playlist.exceptions import (
 # --- プレイリストモジュール ---
 from apps.playlist.models import R_PlaylistArtist, T_Playlist, T_PlaylistTrack
 
-# --- コアモジュール ---
+# --- コアモジュール ---
 from core.consts import LOG_METHOD
 from core.utils.common import dedupe_keep_order, take
 from core.utils.log_helpers import log_output_by_msg_id
@@ -48,14 +48,14 @@ class PlaylistService:
         self.setlist_service = SetlistFmService()
 
     # ------------------------------------------------------------------
-    # 一覧取得系サービス
+    # 一覧取得系サービス
     # ------------------------------------------------------------------
-    # プレイリスト一覧取得
+    # プレイリスト一覧取得
     def list_artist(self, date_now: datetime, kino_id: str, user: M_User, title=None):
         """
-        フィルタリングを考慮したプレイリスト一覧取得
+        フィルタリングを考慮したプレイリスト一覧取得
         """
-        # 1. 基本クエリ（自分かつ未削除 ＋ N+1対策）
+        # 1. 基本クエリ(自分かつ未削除 + N+1対策)
         queryset = T_Playlist.objects.filter(
             user=user, deleted_at__isnull=True
         ).select_related("image")
@@ -70,14 +70,14 @@ class PlaylistService:
         return queryset
 
     # ------------------------------------------------------------------
-    # 詳細取得系サービス
+    # 詳細取得系サービス
     # ------------------------------------------------------------------
-    # プレイリスト詳細取得
+    # プレイリスト詳細取得
     def detail_playlist(
         self, date_now: datetime, kino_id: str, user: M_User, playlist_id: str
     ) -> T_Playlist:
         """
-        特定のプレイリスト詳細を取得する(N+1対策済)
+        特定のプレイリスト詳細を取得する(N+1対策済)
         """
         try:
             # 1. クエリセット構築
@@ -100,12 +100,13 @@ class PlaylistService:
             raise PlaylistNotFoundError()
 
     # ------------------------------------------------------------------
-    # 登録系サービス
+    # 登録系サービス
     # ------------------------------------------------------------------
+    # プレイリスト登録
     def create_playlist(
         self, date_now: datetime, kino_id: str, user: M_User, validated_data: dict
     ) -> T_Playlist:
-        """プレイリストを新規登録する"""
+        """プレイリストを新規登録する"""
         # 1. 画像の保存
         storage_path = None
         if validated_data.get("image"):
@@ -116,7 +117,7 @@ class PlaylistService:
             )
 
         try:
-            # 2. プレイリストの作成
+            # 2. プレイリストの作成
             playlist = T_Playlist.objects.create(
                 user=user,
                 title=validated_data["title"],
@@ -143,7 +144,7 @@ class PlaylistService:
                 ]
                 R_PlaylistArtist.objects.bulk_create(relations)
 
-            # 4. 初期トラックの登録（もしリクエストに含まれる場合）
+            # 4. 初期トラックの登録(もしリクエストに含まれる場合)
             # tracks_data = [{"name": "Song A", "spotify_id": "xxx", "artist": <instance>}, ...]
             tracks_data = validated_data.get("tracks", [])
             track_instances = []
@@ -188,10 +189,61 @@ class PlaylistService:
                 self.storage_service.delete_file(storage_path)
             raise e
 
+    # プレイリストトラック追加
+    def add_playlist_track(
+        self,
+        date_now: datetime,
+        kino_id: str,
+        user: M_User,
+        playlist_id: str,
+        validated_data: dict,
+    ) -> T_Playlist:
+        """プレイリストへトラックを追加する"""
+        # 1. 対象の取得(存在チェック)
+        playlist = None
+        try:
+            playlist: T_Playlist = T_Playlist.objects.select_for_update().get(
+                id=playlist_id,
+                user=user,
+                deleted_at__isnull=True,
+            )
+        except T_Playlist.DoesNotExist:
+            raise PlaylistNotFoundError()
+        
+        # 2. 画像リソース(T_FileResource)の作成
+        spotify_image = None
+        if validated_data.get("artist_spotify_image_url"):
+            spotify_image = T_FileResource.objects.create(
+                file_type=T_FileResource.FileType.IMAGE,
+                external_url=validated_data.get("artist_spotify_image_url"),
+                file_name=f"spotify_{track['name']}_image",
+                created_by=user,
+                created_method=kino_id,
+                updated_by=user,
+                updated_method=kino_id,
+            )
+        
+        # 3. プレイリストトラックの登録
+        T_PlaylistTrack.objects.create(
+            playlist=playlist,
+            name=validated_data.get("name"),
+            spotify_id=validated_data.get("spotify_id"),
+            artist_name=validated_data.get("artist_name"),
+            artist_spotify_id=validated_data.get("artist_spotify_id"),
+            artist_spotify_image=spotify_image,
+            artist_genres=validated_data.get("artist_genres"),
+            created_by=user,
+            created_method=kino_id,
+            updated_by=user,
+            updated_method=kino_id,
+        )
+        
+        return playlist
+
     # ------------------------------------------------------------------
-    # 更新系サービス
+    # 更新系サービス
     # ------------------------------------------------------------------
-    # プレイリスト更新
+    # プレイリスト更新
     def update_playlist(
         self,
         date_now: datetime,
@@ -200,8 +252,8 @@ class PlaylistService:
         playlist_id: str,
         validated_data: dict,
     ) -> T_Playlist:
-        """プレイリスト情報を更新する(洗替対応)"""
-        # 1. 対象の取得（存在チェック）
+        """プレイリスト情報を更新する(洗替対応)"""
+        # 1. 対象の取得(存在チェック)
         try:
             playlist: T_Playlist = T_Playlist.objects.select_for_update().get(
                 id=playlist_id, user=user, deleted_at__isnull=True
@@ -218,7 +270,7 @@ class PlaylistService:
                 original_filename=validated_data["image"].name,
             )
 
-        # 3. 画像の削除対象ファイルパスの退避
+        # 3. 画像の削除対象ファイルパスの退避
         old_storage_path = None
         if "image" in validated_data and playlist.image:
             old_storage_path = playlist.image.storage_path
@@ -248,7 +300,7 @@ class PlaylistService:
             if (
                 "artist_ids" in validated_data
             ):  # validated_dataに含まれているときのみ更新
-                # 中間テーブルR_PlaylistArtistを物理削除
+                # 中間テーブルR_PlaylistArtistを物理削除
                 R_PlaylistArtist.objects.filter(playlist=playlist).delete()
 
                 new_artists = validated_data[
@@ -281,15 +333,15 @@ class PlaylistService:
             raise e
 
     # ------------------------------------------------------------------
-    # 削除系サービス
+    # 削除系サービス
     # ------------------------------------------------------------------
-    # プレイリスト削除
+    # プレイリスト削除
     def delete_playlist(
         elf, date_now: datetime, kino_id: str, user: M_User, playlist_id: str
     ):
-        """プレイリストを論理削除する"""
+        """プレイリストを論理削除する"""
         # 1. 対象の取得
-        # 自分のデータ かつ すでに削除されていないものを対象にする
+        # 自分のデータ かつ すでに削除されていないものを対象にする
         try:
             playlist: T_Playlist = T_Playlist.objects.select_for_update().get(
                 id=playlist_id, user=user, deleted_at__isnull=True
@@ -298,17 +350,17 @@ class PlaylistService:
             raise PlaylistNotFoundError()
 
         # 2. 論理削除処理
-        # deleted_at を入れることで、以降のfilter(deleted_at__isnull=True)から除外される
+        # deleted_at を入れることで、以降のfilter(deleted_at__isnull=True)から除外される
         playlist.updated_by = user
         playlist.updated_method = kino_id
         playlist.deleted_at = date_now
         playlist.save()
 
-        # 3. 関連データの整理
-        # 中間テーブルは物理削除
+        # 3. 関連データの整理
+        # 中間テーブルは物理削除
         R_PlaylistArtist.objects.filter(playlist=playlist).delete()
 
-        # プレイリストに紐づくトラックも論理削除(カスケード的に消す場合)
+        # プレイリストに紐づくトラックも論理削除(カスケード的に消す場合)
         T_PlaylistTrack.objects.filter(
             playlist=playlist, deleted_at__isnull=True
         ).update(
@@ -321,10 +373,49 @@ class PlaylistService:
         if playlist.image:
             self.storage_service.delete_file(playlist.image.storage_path)
 
+    # プレイリストトラック削除
+    def remove_playlist_track(
+        self,
+        date_now: datetime,
+        kino_id: str,
+        user: M_User,
+        playlist_id: str,
+        track_id: str,
+    ):
+        """プレイリスト内のトラックを削除する"""
+        # 1. 対象の取得(プレイリスト/存在チェック)
+        playlist = None
+        try:
+            playlist: T_Playlist = T_Playlist.objects.select_for_update().get(
+                id=playlist_id,
+                user=user,
+                deleted_at__isnull=True,
+            )
+        except T_Playlist.DoesNotExist:
+            raise PlaylistNotFoundError()
+        
+        # 2. 対象の取得(プレイリストトラック/存在チェック)
+        track = None
+        try:
+            track: T_PlaylistTrack = T_PlaylistTrack.objects.select_for_update().get(
+                id=track_id
+                playlist_id=playlist_id,
+                deleted_at__isnull=True,
+            )
+        except T_PlaylistTrack.DoesNotExist:
+            raise PlaylistNotFoundError()
+        
+        # 3. 論理削除処理
+        # deleted_at を入れることで、以降のfilter(deleted_at__isnull=True)から除外される
+        track.updated_by = user
+        track.updated_method = kino_id
+        track.deleted_at = date_now
+        track.save()
+
     # ------------------------------------------------------------------
-    # その他サービス
+    # その他サービス
     # ------------------------------------------------------------------
-    # プレイリスト情報最新化(要: playlist_instance)※SpotifyAPI使用
+    # プレイリスト情報最新化(要: playlist_instance)※SpotifyAPI使用
     def refresh_playlist_tracks(
         self,
         date_now: datetime,
@@ -333,10 +424,10 @@ class PlaylistService:
         playlist_instance: T_Playlist,
     ):
         """
-        プレイリスト内の各トラックが持つspotify_idを基に、
+        プレイリスト内の各トラックが持つspotify_idを基に、
         Spotifyから最新の楽曲情報を取得してDBを更新する
         """
-        # 1. 現在のプレイリストに含まれるトラック(spotify_idを持つもの)を取得
+        # 1. 現在のプレイリストに含まれるトラック(spotify_idを持つもの)を取得
         current_tracks = (
             playlist_instance.playlist_t_playlist_track_set.filter(
                 deleted_at__isnull=True
@@ -350,14 +441,14 @@ class PlaylistService:
         # 2. SpotifyIDの一括取得とFetch
         spotify_ids = list(current_tracks.values_list("spotify_id", flat=True))
 
-        # 3. SpotifyAPIで楽曲情報を一括取得(fetch_get_tracksは内部でsp.tracksを使用)
-        # ※一度に取得できる上限(通常50件)があるため、Service側で調整されている前提
+        # 3. SpotifyAPIで楽曲情報を一括取得(fetch_get_tracksは内部でsp.tracksを使用)
+        # ※一度に取得できる上限(通常50件)があるため、Service側で調整されている前提
         latest_tracks_data = self.spotify_service.fetch_get_tracks(spotify_ids)
 
-        # 4. 取得データをマッピング(SpotifyIDをキーにした辞書)
+        # 4. 取得データをマッピング(SpotifyIDをキーにした辞書)
         latest_map = {track["id"]: track for track in latest_tracks_data if track}
 
-        # 5. 最新データに含まれる全アーティストIDを抽出した上でDB検索(N+1対策)
+        # 5. 最新データに含まれる全アーティストIDを抽出した上でDB検索(N+1対策)
         new_artist_spotify_ids = set()
         for track_info in latest_tracks_data:
             if track_info and track_info.get("artists"):
@@ -374,7 +465,7 @@ class PlaylistService:
             )
         }
 
-        # 6. DBの各レコードを最新データで更新
+        # 6. DBの各レコードを最新データで更新
         for db_track in current_tracks:
             latest = latest_map.get(db_track.spotify_id)
             if not latest:
@@ -385,7 +476,7 @@ class PlaylistService:
 
             if latest.get("artists"):
                 spotify_artist_id = latest["artists"][0]["id"]
-                # 自社DBに存在すればセット(いなければNoneまたは現状維持)
+                # 自社DBに存在すればセット(いなければNoneまたは現状維持)
                 if spotify_artist_id in registered_artists_map:
                     db_track.artist = registered_artists_map[spotify_artist_id]
 
@@ -393,19 +484,19 @@ class PlaylistService:
             db_track.updated_method = kino_id
             db_track.save()
 
-        # 6. プレイリスト本体の更新
+        # 6. プレイリスト本体の更新
         playlist_instance.updated_by = user
         playlist_instance.updated_method = kino_id
         playlist_instance.save()
 
         return playlist_instance
 
-    # プレイリスト生成※SpotifyAPI使用
+    # プレイリスト生成※SpotifyAPI使用
     def generate_playlist_tracks(
         self, date_now: datetime, kino_id: str, user: M_User, validated_data: dict
     ) -> List[dict]:
-        """各種パターンに基づいてトラックデータを生成する"""
-        # 1. パラメータを抽出
+        """各種パターンに基づいてトラックデータを生成する"""
+        # 1. パラメータを抽出
         pattern = validated_data.get("pattern", "top_tracks")
         track_count = validated_data.get("get_tracks_count", 5)
         artist_instances = validated_data.get("artist_ids", [])  # T_Artistのリスト
@@ -439,14 +530,14 @@ class PlaylistService:
                     artist.setlistfm_mbid
                 )
                 if not song_names:
-                    # 見つからなければワーニングログ
+                    # 見つからなければワーニングログ
                     log_output_by_msg_id(
                         log_id="MSGW001",
                         params=[f"対象アーティスト({artist.name})の直近のセトリは0件"],
                         logger_name=LOG_METHOD.APPLICATION.value,
                     )
                 else:
-                    # 曲名でSpotify検索
+                    # 曲名でSpotify検索
                     for name in song_names[:track_count]:
                         query = f"track:{name} artist:{artist.name}"
                         search_results = self.spotify_service.fetch_search_tracks(
@@ -466,7 +557,7 @@ class PlaylistService:
                                 }
                             )
 
-            # C. ムードフィルター(moodfilter)
+            # C. ムードフィルター(moodfilter)
             elif pattern == "moodfilter":
                 # mood_brightness -> valence, mood_intensity -> energy
                 target_valence = validated_data.get("mood_brightness", 50) / 100.0
@@ -490,7 +581,7 @@ class PlaylistService:
                         }
                     )
 
-            # アーティストごとの曲を追加
+            # アーティストごとの曲を追加
             all_tracks_data.extend(artist_tracks)
 
         return all_tracks_data
