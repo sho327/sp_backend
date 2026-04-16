@@ -45,15 +45,6 @@ class T_Artist(BaseModel):
         db_comment="アーティスト名",
         max_length=255,
     )
-    # アーティスト名(英語名)
-    name_en = models.CharField(
-        db_column="name_en",
-        verbose_name="アーティスト名(英語名)",
-        db_comment="アーティスト名(英語名)",
-        max_length=255,
-        null=True,
-        blank=True,
-    )
     # Spotify画像(削除/物理削除の場合はCASCADE)
     spotify_image = models.ForeignKey(
         "common.T_FileResource",
@@ -75,13 +66,12 @@ class T_Artist(BaseModel):
         null=True,
         blank=True,
     )
-
-    # SetlistFm/自動紐付け済フラグ
-    # 自動検索でMBIDを特定した場合はTrue、ユーザーが手動入力した場合はFalseにするなど
-    is_setlistfm_active = models.BooleanField(
-        db_column="is_setlistfm_active",
-        verbose_name="SetlistFm/自動紐付け済フラグ",
-        db_comment="SetlistFm/自動紐付け済フラグ",
+    # MBID/自動紐付けフラグ
+    # 手動での紐づけの場合False、自動設定でMBIDを設定した場合はTrue
+    is_mbid_autoset = models.BooleanField(
+        db_column="is_mbid_autoset",
+        verbose_name="MBID/自動紐付けフラグ",
+        db_comment="MBID/自動紐付けフラグ",
         default=False,
     )
     # コンテキスト/きっかけ(削除/物理削除の場合はSET_NULL)
