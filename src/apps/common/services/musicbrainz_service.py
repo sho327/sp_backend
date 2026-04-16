@@ -20,7 +20,7 @@ class MusicBrainzService:
         "Accept": "application/json"
     }
 
-    def get_artist_by_spotify_id(cls, spotify_id: str) -> dict:
+    def get_artist_by_spotify_id(self, spotify_id: str) -> dict:
         """
         Spotify IDを元にMBIDと英語名を取得する。
         
