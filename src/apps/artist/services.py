@@ -15,6 +15,8 @@ from apps.common.services.spotify_service import SpotifyService
 from apps.common.services.storage_service import StorageService
 from apps.common.services.musicbrainz_service import MusicBrainzService
 
+from core.exceptions import ApplicationError
+
 
 class ArtistService:
     """
@@ -91,8 +93,8 @@ class ArtistService:
         特定のアーティスト詳細を取得する(N+1対策済)
         """
         try:
-            # select_related: 1対1, 多対1 (画像, コンテキスト)
-            # prefetch_related: 多対多 (タグ)
+            # select_related: 1対1, 多対1(画像, コンテキスト)
+            # prefetch_related: 多対多(タグ)
             artist = (
                 T_Artist.objects.filter(
                     id=artist_id, user=user, deleted_at__isnull=True
@@ -144,9 +146,16 @@ class ArtistService:
             )
         
         # 3. MBIDの取得(※MusicBrainzAPIを使用)
-        mbid = self.musicbrainz_service.get_artist_by_spotify_id(
-            spotify_id=validated_data["spotify_id"],
-        )
+        mbid = None
+        is_mbid_autoset = True
+        try:
+            mbid = self.musicbrainz_service.get_artist_by_spotify_id(
+                spotify_id=validated_data["spotify_id"],
+            )
+        except ApplicationError as e:
+            # MBIDが取得できなかった場合は、is_mbid_autoset=Falseとする
+            mbid = None
+            is_mbid_autoset = False
 
         # 4. アーティスト本体の作成
         artist = T_Artist.objects.create(
@@ -154,6 +163,8 @@ class ArtistService:
             spotify_id=validated_data["spotify_id"],
             name=validated_data["name"],
             spotify_image=spotify_image,
+            setlistfm_mbid=mbid,
+            is_mbid_autoset=is_mbid_autoset,
             # validated_data['context_id'] は既にモデルインスタンスになっている
             context=validated_data.get("context_id"),
             genres=validated_data.get("genres", []),
@@ -163,7 +174,7 @@ class ArtistService:
             updated_method=kino_id,
         )
 
-        # 4. タグの紐付け(中間テーブルR_ArtistTagの作成)
+        # 5. タグの紐付け(中間テーブルR_ArtistTagの作成)
         tags = validated_data.get("tag_ids", [])
         if tags:
             tag_links = [
@@ -186,7 +197,12 @@ class ArtistService:
     # ------------------------------------------------------------------
     # アーティスト更新
     def update_artist(
-        self, date_now: datetime, kino_id: str, user: M_User, artist_id, validated_data
+        self, 
+        date_now: datetime, 
+        kino_id: str, 
+        user: M_User, 
+        artist_id,
+        validated_data,
     ):
         """アーティストを新規登録する"""
         # 1. 対象の取得（存在チェック）
@@ -197,37 +213,53 @@ class ArtistService:
         except T_Artist.DoesNotExist:
             raise ArtistNotFoundError()
 
-        # 1. 画像の保存
-        if "image" in validated_data:
-            storage_path = self.storage_service.upload_file(
-                file_data=validated_data["image"].file,
-                folder_path="artists",
-                original_filename=validated_data["image"].name,
-            )
-            self.delete_file(artist.spotify_image.storage_path)
-            artist.spotify_image = T_FileResource.objects.create(
-                file_type=T_FileResource.FileType.IMAGE,
-                storage_path=storage_path,
-                file_name=f"spotify_{validated_data['name']}_image",
-                created_by=user,
-                created_method=kino_id,
-                updated_by=user,
-                updated_method=kino_id,
-            )
+        # 2. Spotify画像URLの更新
+        if "spotify_image_url" in validated_data:
+            new_url = validated_data["spotify_image_url"]
+            
+            # 現在の画像URLと異なる場合のみ更新処理を行う
+            # (artist.spotify_image が T_FileResource インスタンスである前提)
+            current_image = artist.spotify_image
+            
+            # URLが変わっている、もしくは現在画像がない場合
+            if not current_image or current_image.url != new_url:
+                # --- A. 既存レコードを論理削除 ---
+                if current_image:
+                    current_image.deleted_at = date_now
+                    current_image.updated_by = user
+                    current_image.updated_method = kino_id
+                    current_image.save()
 
-        # 2. コンテキストの更新
-        if "context_id" in validated_data:  # validated_dataに含まれているときのみ更新
+                # --- B. 新しいURLでレコードを作成 ---
+                # T_FileResourceに url というフィールドがある想定です
+                new_image_rec = T_FileResource.objects.create(
+                    file_type=T_FileResource.FileType.IMAGE,
+                    url=new_url,  # ここにSpotifyのURLを保存
+                    file_name=f"spotify_{artist.name}_image",
+                    created_by=user,
+                    created_method=kino_id,
+                    updated_by=user,
+                    updated_method=kino_id,
+                )
+                
+                # アーティストに紐付け
+                artist.spotify_image = new_image_rec
+
+        # 3. その他のフィールド更新
+        if "setlistfm_mbid" in validated_data:
+            artist.setlistfm_mbid = validated_data["setlistfm_mbid"]
+        
+        if "is_mbid_autoset" in validated_data:
+            artist.is_mbid_autoset = validated_data["is_mbid_autoset"]
+
+        if "context_id" in validated_data:
             artist.context = validated_data["context_id"]
-
-        # 3. SetlistFmIdの更新
-        if "setlistfm_id" in validated_data:  # validated_dataに含まれているときのみ更新
-            artist.setlistfm_id = validated_data["setlistfm_id"]
 
         artist.updated_method = kino_id
         artist.updated_by = user
         artist.save()
 
-        # 3. タグの更新(洗替方式)
+        # 4. タグの更新(洗替方式)
         if "tag_ids" in validated_data:  # validated_dataに含まれているときのみ更新
             # 既存の紐付けを物理削除(中間テーブルなので物理削除)
             R_ArtistTag.objects.filter(artist=artist).delete()
@@ -265,16 +297,24 @@ class ArtistService:
         except T_Artist.DoesNotExist:
             raise ArtistNotFoundError()
 
-        # 2. 論理削除処理
+        # 2. 紐付いている画像の論理削除
+        # spotify_image(ForeignKey)が存在する場合、そのレコードも論理削除する
+        if artist.spotify_image:
+            image_res = artist.spotify_image
+            image_res.updated_by = user
+            image_res.updated_method = kino_id
+            image_res.deleted_at = date_now
+            image_res.save()
+
+        # 3. アーティスト本体の論理削除処理
         # deleted_at を入れることで、以降のfilter(deleted_at__isnull=True)から除外される
         artist.updated_by = user
         artist.updated_method = kino_id
         artist.deleted_at = date_now
         artist.save()
 
-        # ※ 中間テーブルR_ArtistTagは、親のT_Artistが論理削除されていれば
-        # 通常の一覧取得クエリには出てこなくなるため、そのままでも運用上問題無い(基本はT_Artistのフラグ管理だけでOK)
-        # ※今回は気になるので既存の紐付けも物理削除(中間テーブルなので物理削除)
+        # 4. タグの更新(中間テーブルは物理削除)
+        # カスケード削除されない中間テーブルのレコードを掃除
         R_ArtistTag.objects.filter(artist=artist).delete()
 
     # ------------------------------------------------------------------

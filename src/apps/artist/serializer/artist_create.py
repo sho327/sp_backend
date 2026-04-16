@@ -9,7 +9,6 @@ class ArtistCreateRequestSerializer(serializers.Serializer):
     """
     spotify_id = serializers.CharField(required=True)
     name = serializers.CharField(required=True)
-    name_en = serializers.CharField(required=False, allow_null=True)
     image_url = serializers.URLField(required=False, allow_null=True)
     setlistfm_mbid = serializers.CharField(required=False, allow_null=True)
     is_mbid_autoset = serializers.BooleanField(required=False, allow_null=True)

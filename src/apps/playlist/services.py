@@ -331,7 +331,7 @@ class PlaylistService:
         # 2. SpotifyIDの一括取得とFetch
         spotify_ids = list(current_tracks.values_list("spotify_id", flat=True))
 
-        # 3. Spotify APIで楽曲情報を一括取得(fetch_get_tracksは内部でsp.tracksを使用)
+        # 3. SpotifyAPIで楽曲情報を一括取得(fetch_get_tracksは内部でsp.tracksを使用)
         # ※一度に取得できる上限(通常50件)があるため、Service側で調整されている前提
         latest_tracks_data = self.spotify_service.fetch_get_tracks(spotify_ids)
 
@@ -381,53 +381,6 @@ class PlaylistService:
 
         return playlist_instance
 
-    # プレイリスト情報最新化(要: playlist_track_instance)※SpotifyAPI使用
-    def refresh_playlist_track(
-        self,
-        date_now: datetime,
-        kino_id: str,
-        user: M_User,
-        playlist_track_instance: T_PlaylistTrack,
-    ):
-        """
-        特定のT_PlaylistTrackインスタンスをSpotifyIDを基に最新化する
-        """
-        if not playlist_track_instance.spotify_id:
-            return playlist_track_instance
-
-        # 1. Spotify から 1 件取得
-        latest_data = self.spotify_service.fetch_get_track(
-            playlist_track_instance.spotify_id
-        )
-        if not latest_data:
-            return playlist_track_instance
-
-        # 2. 基本情報の更新
-        playlist_track_instance.name = latest_data.get(
-            "name", playlist_track_instance.name
-        )
-
-        # 3. アーティスト紐付けの試行
-        if latest_data.get("artists"):
-            spotify_artist_id = latest_data["artists"][0]["id"]
-
-            # 自社 DB に登録されているか確認
-            try:
-                # ユーザーに紐づく有効なアーティストを検索
-                artist = T_Artist.objects.get(
-                    user=user, spotify_id=spotify_artist_id, deleted_at__isnull=True
-                )
-                playlist_track_instance.artist = artist
-            except T_Artist.DoesNotExist:
-                # 登録されていなければ紐付けは行わない(既存の紐付けを維持するかは要件次第)
-                pass
-
-        playlist_track_instance.updated_by = user
-        playlist_track_instance.updated_method = kino_id
-        playlist_track_instance.save()
-
-        return playlist_track_instance
-
     # プレイリスト生成※SpotifyAPI使用
     def generate_playlist_tracks(
         self, date_now: datetime, kino_id: str, user: M_User, validated_data: dict
@@ -459,8 +412,8 @@ class PlaylistService:
 
             # B. 最近のセトリ(set_list)
             elif pattern == "set_list":
-                song_names = self.setlist_service.get_latest_setlist_song_names(
-                    artist.name
+                song_names = self.setlist_service.get_latest_setlist_by_mbid(
+                    artist.setlistfm_mbid
                 )
                 if not song_names:
                     # 見つからなければワーニングログ
