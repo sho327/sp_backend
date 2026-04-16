@@ -2,7 +2,7 @@ import os
 import uuid
 from pathlib import Path
 from typing import BinaryIO, Optional
-from core.exceptions import ExternalServiceError
+from core.exceptions.exceptions import ExternalServiceError
 
 class StorageService:
     def __init__(self, base_dir: str = "media"):

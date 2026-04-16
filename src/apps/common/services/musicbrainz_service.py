@@ -3,7 +3,7 @@ import logging
 from django.core.cache import cache
 from django.conf import settings
 from apps.common.exceptions import ArtistMBIDNotFoundError
-from core.exceptions import ExternalServiceError
+from core.exceptions.exceptions import ExternalServiceError
 
 logger = logging.getLogger(__name__)
 

@@ -3,7 +3,7 @@ import requests
 import logging
 from django.conf import settings
 from apps.common.exceptions import SetlistNotFoundError
-from core.exceptions import ExternalServiceError
+from core.exceptions.exceptions import ExternalServiceError
 
 logger = logging.getLogger(__name__)
 

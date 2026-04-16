@@ -15,7 +15,7 @@ from apps.common.services.spotify_service import SpotifyService
 from apps.common.services.storage_service import StorageService
 from apps.common.services.musicbrainz_service import MusicBrainzService
 
-from core.exceptions import ApplicationError
+from core.exceptions.exceptions import ApplicationError
 
 
 class ArtistService:
