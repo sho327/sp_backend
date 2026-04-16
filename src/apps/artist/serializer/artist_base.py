@@ -25,7 +25,7 @@ class ArtistMiniResponseSerializer(ArtistBaseSerializer):
     tags = MasterArtistTagMiniResponseSerializer(many=True, read_only=True)
 
     class Meta(ArtistBaseSerializer.Meta):
-        fields = ['id', 'name', 'name_en', 'spotify_id', 'image_url', 'tags']
+        fields = ['id', 'name', 'spotify_id', 'image_url', 'tags']
 
 class ArtistFullResponseSerializer(ArtistBaseSerializer):
     """
