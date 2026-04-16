@@ -13,6 +13,7 @@ from apps.artist.models import R_ArtistTag, T_Artist
 from apps.common.models import T_FileResource
 from apps.common.services.spotify_service import SpotifyService
 from apps.common.services.storage_service import StorageService
+from apps.common.services.musicbrainz_service import MusicBrainzService
 
 
 class ArtistService:
@@ -23,6 +24,7 @@ class ArtistService:
     def __init__(self):
         self.spotify_service = SpotifyService()
         self.storage_service = StorageService()
+        self.musicbrainz_service = MusicBrainzService()
 
     def _update_spotify_image(
         self,
@@ -110,7 +112,11 @@ class ArtistService:
     # ------------------------------------------------------------------
     # アーティスト登録
     def create_artist(
-        self, date_now: datetime, kino_id: str, user: M_User, validated_data
+        self, 
+        date_now: datetime, 
+        kino_id: str, 
+        user: M_User, 
+        validated_data,
     ):
         """アーティストを新規登録する"""
         # 1. 重複チェック(論理削除されていない同一SpotifyIDがないか)
@@ -136,8 +142,13 @@ class ArtistService:
                 updated_by=user,
                 updated_method=kino_id,
             )
+        
+        # 3. MBIDの取得(※MusicBrainzAPIを使用)
+        mbid = self.musicbrainz_service.get_artist_by_spotify_id(
+            spotify_id=validated_data["spotify_id"],
+        )
 
-        # 3. アーティスト本体の作成
+        # 4. アーティスト本体の作成
         artist = T_Artist.objects.create(
             user=user,
             spotify_id=validated_data["spotify_id"],
