@@ -23,6 +23,7 @@ from apps.playlist.exceptions import (
     PlaylistExternalServiceError,
     PlaylistNotFoundError,
     PlaylistReplaceError,
+    PlaylistTrackNotFoundError,
 )
 
 # --- プレイリストモジュール ---
@@ -199,7 +200,7 @@ class PlaylistService:
         validated_data: dict,
     ) -> T_Playlist:
         """プレイリストへトラックを追加する"""
-        # 1. 対象の取得(存在チェック)
+        # 1. 対象の取得(プレイリスト/存在チェック)
         playlist = None
         try:
             playlist: T_Playlist = T_Playlist.objects.select_for_update().get(
@@ -216,7 +217,7 @@ class PlaylistService:
             spotify_image = T_FileResource.objects.create(
                 file_type=T_FileResource.FileType.IMAGE,
                 external_url=validated_data.get("artist_spotify_image_url"),
-                file_name=f"spotify_{track['name']}_image",
+                file_name=f"spotify_{validated_data['name']}_image",
                 created_by=user,
                 created_method=kino_id,
                 updated_by=user,
@@ -383,29 +384,32 @@ class PlaylistService:
         track_id: str,
     ):
         """プレイリスト内のトラックを削除する"""
-        # 1. 対象の取得(プレイリスト/存在チェック)
-        playlist = None
-        try:
-            playlist: T_Playlist = T_Playlist.objects.select_for_update().get(
-                id=playlist_id,
-                user=user,
-                deleted_at__isnull=True,
-            )
-        except T_Playlist.DoesNotExist:
+        # 1. プレイリストの存在チェック
+        if not T_Playlist.objects.filter(id=playlist_id, user=user, deleted_at__isnull=True).exists():
             raise PlaylistNotFoundError()
         
         # 2. 対象の取得(プレイリストトラック/存在チェック)
         track = None
         try:
             track: T_PlaylistTrack = T_PlaylistTrack.objects.select_for_update().get(
-                id=track_id
+                id=track_id,
                 playlist_id=playlist_id,
                 deleted_at__isnull=True,
             )
         except T_PlaylistTrack.DoesNotExist:
-            raise PlaylistNotFoundError()
+            raise PlaylistTrackNotFoundError()
         
-        # 3. 論理削除処理
+         # 3. 紐づくファイルリソース(画像)の削除
+        # スナップショット的に作成したものなので、トラック消滅と共に不要となる
+        if track.artist_spotify_image:
+            # ストレージ上の実ファイルがある場合はそれも消す
+            if track.artist_spotify_image.storage_path:
+                self.storage_service.delete_file(track.artist_spotify_image.storage_path)
+            
+            # FileResourceレコード自体の削除(物理削除でOKな場合)
+            track.artist_spotify_image.delete()
+        
+        # 4. 論理削除処理
         # deleted_at を入れることで、以降のfilter(deleted_at__isnull=True)から除外される
         track.updated_by = user
         track.updated_method = kino_id
