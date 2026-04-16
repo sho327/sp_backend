@@ -3,6 +3,16 @@ from rest_framework import serializers
 # --- アーティストモジュール ---
 from apps.artist.models import T_Artist
 
+class TrackRequestSerializer(serializers.Serializer):
+    """
+    入力：フロントエンドから送られてくるデータの検品
+    """
+    name = serializers.CharField(required=True)
+    spotify_id = serializers.CharField(required=True)
+    artist_name = serializers.CharField(required=True)
+    artist_spotify_id = serializers.CharField(required=True)
+    artist_spotify_image_url = serializers.URLField(required=True)
+    artist_genres = serializers.ListField(child=serializers.CharField(), required=True)
 
 class PlaylistCreateRequestSerializer(serializers.Serializer):
     """
@@ -23,3 +33,4 @@ class PlaylistCreateRequestSerializer(serializers.Serializer):
         required=False,
         allow_null=True,
     )
+    tracks = serializers.ListField(child=TrackRequestSerializer(), required=False, allow_null=True)

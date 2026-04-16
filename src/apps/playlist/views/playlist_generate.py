@@ -56,14 +56,8 @@ class PlaylistGenerateView(BaseAPIView):
                 tracks_data, many=True
             )
 
-            # レスポンスデータ構築
-            response_data = {
-                "title": serializer.validated_data.get("title"),
-                "tracks": res_tracks_serializer.data,
-            }
-
             # 成功レスポンス返却
-            return self.get_success_map_response(response_data)
+            return self.get_success_list_response(res_tracks_serializer.data)
 
         except ApplicationError:
             raise

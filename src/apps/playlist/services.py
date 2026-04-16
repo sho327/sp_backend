@@ -146,20 +146,39 @@ class PlaylistService:
             # 4. 初期トラックの登録（もしリクエストに含まれる場合）
             # tracks_data = [{"name": "Song A", "spotify_id": "xxx", "artist": <instance>}, ...]
             tracks_data = validated_data.get("tracks", [])
+            track_instances = []
             if tracks_data:
-                track_instances = [
-                    T_PlaylistTrack(
-                        playlist=playlist,
-                        name=track.get("name"),
-                        spotify_id=track.get("spotify_id"),
-                        artist=track.get("artist"),  # T_Artistインスタンス
-                        created_by=user,
-                        created_method=kino_id,
-                        updated_by=user,
-                        updated_method=kino_id,
+                for track in tracks_data:
+                    # 4-1. 画像リソース(T_FileResource)の作成
+                    spotify_image = None
+                    if track.get("artist_spotify_image_url"):
+                        spotify_image = T_FileResource.objects.create(
+                            file_type=T_FileResource.FileType.IMAGE,
+                            external_url=track["artist_spotify_image_url"],
+                            file_name=f"spotify_{track['name']}_image",
+                            created_by=user,
+                            created_method=kino_id,
+                            updated_by=user,
+                            updated_method=kino_id,
+                        )
+                    # 4-2. トラックのインスタンス作成
+                    track_instances.append(
+                        T_PlaylistTrack(
+                            playlist=playlist,
+                            name=track.get("name"),
+                            spotify_id=track.get("spotify_id"),
+                            artist_name=track.get("artist_name"),
+                            artist_spotify_id=track.get("artist_spotify_id"),
+                            artist_spotify_image=spotify_image,
+                            artist_genres=track.get("artist_genres"),
+                            created_by=user,
+                            created_method=kino_id,
+                            updated_by=user,
+                            updated_method=kino_id,
+                        )
                     )
-                    for track in tracks_data
-                ]
+
+                # 4-3. トラックの一括作成
                 T_PlaylistTrack.objects.bulk_create(track_instances)
 
             return playlist
@@ -399,14 +418,18 @@ class PlaylistService:
             # A. 人気順(top_tracks)
             if pattern == "top_tracks":
                 tracks = self.spotify_service.fetch_get_artist_top_tracks(
-                    artist.spotify_id, limit=track_count
+                    artist.spotify_id, 
+                    limit=track_count,
                 )
                 for t in tracks:
                     artist_tracks.append(
                         {
                             "name": t.get("name"),
                             "spotify_id": t.get("id"),
-                            "artist": artist,
+                            "artist_name": artist.name,
+                            "artist_spotify_id": artist.spotify_id,
+                            "artist_spotify_image_url": artist.spotify_image.url if artist.spotify_image else None,
+                            "artist_genres": artist.genres,
                         }
                     )
 
@@ -427,7 +450,8 @@ class PlaylistService:
                     for name in song_names[:track_count]:
                         query = f"track:{name} artist:{artist.name}"
                         search_results = self.spotify_service.fetch_search_tracks(
-                            query, limit=1
+                            query,
+                            limit=1,
                         )
                         if search_results:
                             t = search_results[0]
@@ -435,7 +459,10 @@ class PlaylistService:
                                 {
                                     "name": t.get("name"),
                                     "spotify_id": t.get("id"),
-                                    "artist": artist,
+                                    "artist_name": artist.name,
+                                    "artist_spotify_id": artist.spotify_id,
+                                    "artist_spotify_image_url": artist.spotify_image.url if artist.spotify_image else None,
+                                    "artist_genres": artist.genres,
                                 }
                             )
 
@@ -456,7 +483,10 @@ class PlaylistService:
                         {
                             "name": t.get("name"),
                             "spotify_id": t.get("id"),
-                            "artist": artist,
+                            "artist_name": artist.name,
+                            "artist_spotify_id": artist.spotify_id,
+                            "artist_spotify_image_url": artist.spotify_image.url if artist.spotify_image else None,
+                            "artist_genres": artist.genres,
                         }
                     )
 

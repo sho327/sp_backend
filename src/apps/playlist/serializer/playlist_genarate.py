@@ -10,9 +10,6 @@ class PlaylistGenerateRequestSerializer(serializers.Serializer):
     ※バイナリ画像を扱うため、Multipartリクエスト専用
     """
 
-    title = serializers.CharField(required=True)
-    image = serializers.ImageField()
-    spotify_id = serializers.CharField(required=True)
     # ※PrimaryKeyRelatedFieldを利用
     # serializers.PrimaryKeyRelatedFieldのqueryset にフィルタをかけている場合、
     # DRFはバリデーション時(is_valid()実行時)に以下の挙動を行う
@@ -40,13 +37,21 @@ class PlaylistGenerateRequestSerializer(serializers.Serializer):
         default=0,
     )
 
-
-class PlaylistTrackGenerateResponseSerializer(serializers.Serializer):
+class TrackResponseSerializer(serializers.Serializer):
     """
     出力：生成された楽曲データの返却用
     """
 
     name = serializers.CharField()
     spotify_id = serializers.CharField()
-    artist_name = serializers.CharField(source="artist.name")
-    artist_id = serializers.UUIDField(source="artist.id")
+    artist_name = serializers.CharField()
+    artist_spotify_id = serializers.CharField()
+    artist_spotify_image_url = serializers.URLField()
+    artist_genres = serializers.ListField(child=serializers.CharField())
+
+class PlaylistTrackGenerateResponseSerializer(serializers.Serializer):
+    """
+    出力：生成されたプレイリストトラックデータの返却用
+    """
+    tracks = serializers.ListField(child=TrackResponseSerializer())
+
