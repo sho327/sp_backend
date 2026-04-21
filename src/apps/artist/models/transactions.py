@@ -47,6 +47,15 @@ class T_Artist(BaseModel):
         db_comment="アーティスト名",
         max_length=255,
     )
+    # アーティスト名/LastFM
+    lastfm_name = models.CharField(
+        db_column="lastfm_name",
+        verbose_name="アーティスト名/LastFM",
+        db_comment="アーティスト名/LastFM",
+        max_length=255,
+        null=True,
+        blank=True,
+    )
     # Deezer画像(削除/物理削除の場合はCASCADE)
     deezer_image = models.ForeignKey(
         "common.T_FileResource",

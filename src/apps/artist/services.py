@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import datetime
 
 from django.utils import timezone
@@ -11,12 +12,12 @@ from apps.artist.models import R_ArtistTag, T_Artist
 
 # --- 共通モジュール ---
 from apps.common.models import T_FileResource
-from apps.common.services.storage_service import StorageService
-from apps.common.services.musicbrainz_service import MusicBrainzService
 from apps.common.services.deezer_service import DeezerService
 from apps.common.services.musicbrainz_service import MusicBrainzService
-
+from apps.common.services.storage_service import StorageService
+from core.consts import LOG_METHOD
 from core.exceptions.exceptions import ApplicationError
+from core.utils.log_helpers import log_output_by_msg_id
 
 
 class ArtistService:
@@ -85,6 +86,143 @@ class ArtistService:
 
         return queryset
 
+    # 関連アーティスト一覧取得
+    def list_related_artist(
+        self,
+        date_now: datetime,
+        kino_id: str,
+        user: M_User,
+        validated_data,
+    ):
+        """
+        関連するアーティスト一覧取得
+        """
+        include_mbid = validated_data.get("include_mbid", False)
+        # 1. 基本クエリ(自分かつ未削除)
+        recent_artists = (
+            T_Artist.objects.filter(user=user, deleted_at__isnull=True)
+            .order_by("-created_at")
+            .values("name", "lastfm_name")[:10]
+        )
+        old_artists = (
+            T_Artist.objects.filter(user=user, deleted_at__isnull=True)
+            .order_by("created_at")
+            .values("name", "lastfm_name")[:10]
+        )
+
+        original_artists = list(recent_artists) + list(old_artists)
+
+        # 関連アーティストの集計処理
+        # キー: アーティスト名, 値: スコア合計
+        related_artist_scores = defaultdict(float)
+
+        # 既存のアーティスト名のリスト（除外用）
+        original_names = {a["name"] for a in original_artists}
+
+        # 関連アーティストの追加
+        for artist in original_artists:
+            try:
+                artist_name = artist["name"]
+                # 1. LastFM側を検索し正式名称を取得
+                l_artist_name = self.lastfm_service.get_canonical_artist_name(
+                    artist_name
+                )
+                if not l_artist_name:
+                    continue
+
+                # 関連アーティストを10件ずつ取得
+                # Last.fm APIの "match" フィールドを利用
+                l_artists = self.lastfm_service.get_similar_artists(
+                    l_artist_name, limit=10
+                )
+
+                for l_artist in l_artists:
+                    # 既に選択されているアーティストは関連として追加しない
+                    if l_artist["name"] in original_names:
+                        continue
+
+                    # スコアを加算 (Last.fmの match は文字列の数値なのでfloatに変換)
+                    score = float(l_artist.get("match", 0))
+                    related_artist_scores[l_artist["name"]] += score
+
+            except Exception as e:
+                # ここでログを出して、失敗したアーティストはスキップし、次の処理へ継続
+                log_output_by_msg_id(
+                    log_id="MSGW001",
+                    params=[
+                        f"Warning: Failed to fetch related artists for {artist['name']}: {str(e)}"
+                    ],
+                    logger_name=LOG_METHOD.APPLICATION.value,
+                )
+                continue
+
+        # 2. スコアでソートして関連アーティストの上位5件を抽出
+        # items = [("アーティスト名", スコア), ...]
+        sorted_related = sorted(
+            related_artist_scores.items(), key=lambda x: x[1], reverse=True
+        )
+        top_related = sorted_related[:5]
+
+        deezer_raw_list = []
+        # 3. 上位の関連アーティストをDeezerで検索して追加
+        for name, score in top_related:
+            try:
+                # Deezerで検索してIDを取得
+                deezer_results = self.deezer_service.fetch_search_artists(
+                    query=name, limit=1
+                )
+                if not deezer_results:
+                    continue
+
+                deezer_raw_list.append(deezer_results[0])
+
+            except Exception as e:
+                # Deezer検索失敗時も、他のアーティスト処理を止めない
+                log_output_by_msg_id(
+                    log_id="MSGW001",
+                    params=[
+                        f"Warning: Failed to fetch Deezer data for {name}: {str(e)}"
+                    ],
+                    logger_name=LOG_METHOD.APPLICATION.value,
+                )
+                continue
+
+        # IDの抽出と文字列化(ループ内でのstr()変換を減らす)
+        deezer_id_map = {str(item["id"]): item for item in deezer_raw_list}
+        deezer_ids = list(deezer_id_map.keys())
+
+        # 3. MBID取得(必要な場合のみ)
+        external_mbid_map = {}
+        if include_mbid:
+            for d_id in deezer_ids:
+                try:
+                    result = self.musicbrainz_service.get_artist_by_deezer_id(
+                        deezer_id=d_id
+                    )
+                    external_mbid_map[d_id] = result.get("mbid")
+                except ApplicationError:
+                    external_mbid_map[d_id] = None
+
+        # 4. 生データに「is_registered」フラグ「mbid」をマージして整形
+        formatted_results = []
+        for d_id, item in deezer_id_map.items():
+            formatted_results.append(
+                {
+                    "deezer_id": d_id,
+                    "name": item["name"],
+                    # 画像URLの階層をフロントが扱いやすいようにフラットにする
+                    "image_url": item.get("picture_big"),
+                    # "genres": item.get("genres", []),
+                    # "popularity": item.get("popularity"),
+                    "is_registered": False,
+                    "mbid": (external_mbid_map.get(d_id)),
+                    # T_Artistのフィールドをそのまま返却未登録の場合はNone)
+                    "setlistfm_mbid": (None),
+                }
+            )
+
+        return formatted_results
+
     # ------------------------------------------------------------------
     # 詳細取得系サービス
     # ------------------------------------------------------------------
@@ -115,10 +253,10 @@ class ArtistService:
     # ------------------------------------------------------------------
     # アーティスト登録
     def create_artist(
-        self, 
-        date_now: datetime, 
-        kino_id: str, 
-        user: M_User, 
+        self,
+        date_now: datetime,
+        kino_id: str,
+        user: M_User,
         validated_data,
     ):
         """アーティストを新規登録する"""
@@ -145,12 +283,15 @@ class ArtistService:
                 updated_by=user,
                 updated_method=kino_id,
             )
-        
+
         # 3. MBIDの登録(未設定の場合は取得し登録する)
         # ※検索時にもMBIDを返すので、自動設定は基本使わない予定(検索でのMBID大量取得が重ければこちらを検討)
         mbid = None
         is_mbid_autoset = True
-        if validated_data.get("setlistfm_mbid") and validated_data.get("is_mbid_autoset") is not None:
+        if (
+            validated_data.get("setlistfm_mbid")
+            and validated_data.get("is_mbid_autoset") is not None
+        ):
             mbid = validated_data.get("setlistfm_mbid")
             is_mbid_autoset = validated_data.get("is_mbid_autoset", False)
         else:
@@ -205,10 +346,10 @@ class ArtistService:
     # ------------------------------------------------------------------
     # アーティスト更新
     def update_artist(
-        self, 
-        date_now: datetime, 
-        kino_id: str, 
-        user: M_User, 
+        self,
+        date_now: datetime,
+        kino_id: str,
+        user: M_User,
         artist_id,
         validated_data,
     ):
@@ -224,11 +365,11 @@ class ArtistService:
         # 2. Deezer画像URLの更新(通常送られてくる想定はないが、変えれるように入れておく)
         if "deezer_image_url" in validated_data:
             new_url = validated_data["deezer_image_url"]
-            
+
             # 現在の画像URLと異なる場合のみ更新処理を行う
             # (artist.deezer_image が T_FileResource インスタンスである前提)
             current_image = artist.deezer_image
-            
+
             # URLが変わっている、もしくは現在画像がない場合
             if not current_image or current_image.url != new_url:
                 # --- A. 既存レコードを論理削除 ---
@@ -249,7 +390,7 @@ class ArtistService:
                     updated_by=user,
                     updated_method=kino_id,
                 )
-                
+
                 # アーティストに紐付け
                 artist.deezer_image = new_image_rec
 
@@ -402,7 +543,9 @@ class ArtistService:
         return updated_artists
 
     # アーティスト検索※DeezerAPI使用
-    def search_artist(self, date_now: datetime, kino_id: str, user: M_User, validated_data):
+    def search_artist(
+        self, date_now: datetime, kino_id: str, user: M_User, validated_data
+    ):
         """
         DeezerAPIでアーティストを検索し、自社DBの登録状況を付与して返す
         """
@@ -411,9 +554,9 @@ class ArtistService:
         limit = validated_data.get("limit", 10)
         include_mbid = validated_data.get("include_mbid", False)
 
-        # 1. DeezerService(認証済み)を使用して検索実行
+        # 1. DeezerServiceを使用して検索実行
         deezer_raw_list = self.deezer_service.fetch_search_artists(
-            query=query, 
+            query=query,
             limit=limit,
         )
         if not deezer_raw_list:
@@ -431,7 +574,9 @@ class ArtistService:
         ).values("deezer_id", "setlistfm_mbid")
 
         # 検索用に辞書化: { "deezer_id": "setlistfm_mbid" }
-        registered_map = {str(item["deezer_id"]): item["setlistfm_mbid"] for item in registered_data}
+        registered_map = {
+            str(item["deezer_id"]): item["setlistfm_mbid"] for item in registered_data
+        }
 
         # 3. MBID取得(必要な場合のみ)
         external_mbid_map = {}
@@ -440,7 +585,9 @@ class ArtistService:
                 # 登録済みならDBのsetlistfm_mbidがあるため、外部APIは呼ばない
                 if d_id not in registered_map:
                     try:
-                        result = self.musicbrainz_service.get_artist_by_deezer_id(deezer_id=d_id)
+                        result = self.musicbrainz_service.get_artist_by_deezer_id(
+                            deezer_id=d_id
+                        )
                         external_mbid_map[d_id] = result.get("mbid")
                     except ApplicationError:
                         external_mbid_map[d_id] = None
@@ -449,17 +596,25 @@ class ArtistService:
         formatted_results = []
         for d_id, item in deezer_id_map.items():
             is_registered = d_id in registered_map
-            formatted_results.append({
-                "deezer_id": d_id,
-                "name": item["name"],
-                # 画像URLの階層をフロントが扱いやすいようにフラットにする
-                "image_url": item.get("picture_big"),
-                # "genres": item.get("genres", []),
-                # "popularity": item.get("popularity"),
-                "is_registered": is_registered,
-                "mbid": registered_map.get(d_id) if is_registered else external_mbid_map.get(d_id),
-                # T_Artistのフィールドをそのまま返却未登録の場合はNone)
-                "setlistfm_mbid": registered_map.get(d_id) if is_registered else None,
-            })
+            formatted_results.append(
+                {
+                    "deezer_id": d_id,
+                    "name": item["name"],
+                    # 画像URLの階層をフロントが扱いやすいようにフラットにする
+                    "image_url": item.get("picture_big"),
+                    # "genres": item.get("genres", []),
+                    # "popularity": item.get("popularity"),
+                    "is_registered": is_registered,
+                    "mbid": (
+                        registered_map.get(d_id)
+                        if is_registered
+                        else external_mbid_map.get(d_id)
+                    ),
+                    # T_Artistのフィールドをそのまま返却未登録の場合はNone)
+                    "setlistfm_mbid": (
+                        registered_map.get(d_id) if is_registered else None
+                    ),
+                }
+            )
 
         return formatted_results
