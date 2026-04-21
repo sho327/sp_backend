@@ -8,6 +8,7 @@ class PlaylistError(ApplicationError):
     """
     プレイリスト(Playlist)ドメインにおける全てのビジネス例外の基底クラス。
     """
+
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     message_id = "ERR_PLY_000"
     message = "Playlist Error"
@@ -18,8 +19,10 @@ class PlaylistError(ApplicationError):
 # 参照・整合性系 (404, 400)
 # --------------------------------------------------
 
+
 class PlaylistNotFoundError(PlaylistError):
     """指定されたプレイリストが見つからない場合に発生"""
+
     status_code = status.HTTP_404_NOT_FOUND
     message_id = "ERR_PLY_101"
     message = "Playlist Not Found Error"
@@ -28,6 +31,7 @@ class PlaylistNotFoundError(PlaylistError):
 
 class InvalidPlaylistRequestError(PlaylistError):
     """リクエストパラメータが業務上不正な場合に発生"""
+
     status_code = status.HTTP_400_BAD_REQUEST
     message_id = "ERR_PLY_102"
     message = "Invalid Playlist Request Error"
@@ -38,8 +42,10 @@ class InvalidPlaylistRequestError(PlaylistError):
 # 権限・制限系 (403, 400)
 # --------------------------------------------------
 
+
 class PlaylistPermissionError(PlaylistError):
     """他人のプレイリストを操作しようとした場合に発生"""
+
     status_code = status.HTTP_403_FORBIDDEN
     message_id = "ERR_PLY_106"
     message = "Playlist Permission Error"
@@ -48,6 +54,7 @@ class PlaylistPermissionError(PlaylistError):
 
 class PlaylistTrackLimitError(PlaylistError):
     """1つのプレイリスト内の曲数制限に達した場合"""
+
     status_code = status.HTTP_400_BAD_REQUEST
     message_id = "ERR_PLY_107"
     message = "Playlist Track Limit Error"
@@ -56,13 +63,16 @@ class PlaylistTrackLimitError(PlaylistError):
 
 class PlaylistTrackNotFoundError(PlaylistError):
     """トラックが見つからない場合(404の細分化)"""
+
     status_code = status.HTTP_404_NOT_FOUND
     message_id = "ERR_PLY_108"
     message = "Playlist Track Not Found Error"
     detail = "指定されたトラックが存在しないか、既に削除されています。"
 
+
 class PlaylistTrackAlreadyExistsError(PlaylistError):
     """プレイリストに既に同一のトラックが存在する場合に発生"""
+
     status_code = status.HTTP_409_CONFLICT
     message_id = "ERR_PLY_109"
     message = "Playlist Track Already Exists Error"

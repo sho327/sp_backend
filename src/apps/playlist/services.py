@@ -1,31 +1,36 @@
+from collections import defaultdict
 from datetime import datetime
 from typing import List
-from django.db.models import Sum, Q, Value
+
+from django.db.models import Q, Sum, Value
 from django.db.models.functions import Coalesce
-from collections import defaultdict
 
 # --- アカウントモジュール ---
 from apps.account.models import M_User
+from apps.common.exceptions import SetlistNotFoundError
 
 # --- 共通モジュール ---
 from apps.common.models import T_FileResource
+from apps.common.services.deezer_service import DeezerService
+from apps.common.services.lastfm_service import LastfmService
+from apps.common.services.musicbrainz_service import MusicBrainzService
 from apps.common.services.setlistfm_service import SetlistFmService
 from apps.common.services.spotify_service import SpotifyService
-from apps.common.services.deezer_service import DeezerService
 from apps.common.services.storage_service import StorageService
-from apps.common.services.musicbrainz_service import MusicBrainzService
-from apps.common.services.lastfm_service import LastfmService
-from apps.common.exceptions import SetlistNotFoundError
+from apps.playlist.exceptions import (
+    PlaylistNotFoundError,
+    PlaylistTrackAlreadyExistsError,
+    PlaylistTrackNotFoundError,
+)
 
 # --- プレイリストモジュール ---
 from apps.playlist.models import R_PlaylistArtist, T_Playlist, T_PlaylistTrack
-from apps.playlist.exceptions import PlaylistNotFoundError, PlaylistTrackNotFoundError, PlaylistTrackAlreadyExistsError
 
 # --- コアモジュール ---
 from core.consts import LOG_METHOD
+from core.exceptions.exceptions import ApplicationError
 from core.utils.log_helpers import log_output_by_msg_id
 from core.utils.thread_pool_executor import executor
-from core.exceptions.exceptions import ApplicationError
 
 
 class PlaylistService:
@@ -44,7 +49,7 @@ class PlaylistService:
         self.storage_service = StorageService()
         self.musicbrainz_service = MusicBrainzService()
         self.lastfm_service = LastfmService()
-    
+
     def _format_spotify_track(self, track: dict) -> dict:
         """Spotifyのレスポンスを共通フォーマットに変換するプライベートメソッド"""
         popularity = track.get("popularity")
@@ -71,17 +76,23 @@ class PlaylistService:
         フィルタリングを考慮したプレイリスト一覧取得
         """
         # 1. 基本クエリ(自分かつ未削除/N+1対策)
-        queryset = T_Playlist.objects.filter(
-            user=user, 
-            deleted_at__isnull=True,
-        ).select_related("image").annotate(
-            # 合計時間の計算(trackが0件なら0を返すようにCoalesceで保護)
-            total_spotify_duration_ms=Coalesce(
-                Sum(
-                    'playlist_t_playlist_track_set__spotify_duration_ms',
-                    filter=Q(playlist_t_playlist_track_set__deleted_at__isnull=True)
-                ),
-                Value(0)
+        queryset = (
+            T_Playlist.objects.filter(
+                user=user,
+                deleted_at__isnull=True,
+            )
+            .select_related("image")
+            .annotate(
+                # 合計時間の計算(trackが0件なら0を返すようにCoalesceで保護)
+                total_spotify_duration_ms=Coalesce(
+                    Sum(
+                        "playlist_t_playlist_track_set__spotify_duration_ms",
+                        filter=Q(
+                            playlist_t_playlist_track_set__deleted_at__isnull=True
+                        ),
+                    ),
+                    Value(0),
+                )
             )
         )
 
@@ -110,19 +121,19 @@ class PlaylistService:
             # prefetch_related: アーティスト(ManyToManyField), トラック(逆参照)
             playlist = (
                 T_Playlist.objects.filter(
-                    id=playlist_id, 
-                    user=user, 
-                    deleted_at__isnull=True
+                    id=playlist_id, user=user, deleted_at__isnull=True
                 )
                 .select_related("image")
                 .prefetch_related("artists", "playlist_t_playlist_track_set")
                 .annotate(
                     total_spotify_duration_ms=Coalesce(
                         Sum(
-                            'playlist_t_playlist_track_set__spotify_duration_ms',
-                            filter=Q(playlist_t_playlist_track_set__deleted_at__isnull=True)
+                            "playlist_t_playlist_track_set__spotify_duration_ms",
+                            filter=Q(
+                                playlist_t_playlist_track_set__deleted_at__isnull=True
+                            ),
                         ),
-                        Value(0)
+                        Value(0),
                     )
                 )
                 .get()
@@ -201,7 +212,7 @@ class PlaylistService:
                         created_method=kino_id,
                         updated_by=user,
                         updated_method=kino_id,
-                        **track
+                        **track,
                     )
                     for track in tracks
                 ]
@@ -233,16 +244,16 @@ class PlaylistService:
             )
         except T_Playlist.DoesNotExist:
             raise PlaylistNotFoundError()
-        
+
         # 既に同一のspotify_idが存在するかチェック
         spotify_id = validated_data.get("spotify_id")
         if T_PlaylistTrack.objects.filter(
-            playlist=playlist, 
+            playlist=playlist,
             spotify_id=spotify_id,
-            deleted_at__isnull=True # 論理削除されていないもののみチェック
+            deleted_at__isnull=True,  # 論理削除されていないもののみチェック
         ).exists():
             raise PlaylistTrackAlreadyExistsError()
-        
+
         # 2. プレイリストトラックの登録
         track = T_PlaylistTrack.objects.create(
             playlist=playlist,
@@ -258,7 +269,7 @@ class PlaylistService:
         playlist.updated_by = user
         playlist.updated_method = kino_id
         playlist.save()
-        
+
         return track
 
     # ------------------------------------------------------------------
@@ -281,7 +292,7 @@ class PlaylistService:
             )
         except T_Playlist.DoesNotExist:
             raise PlaylistNotFoundError()
-        
+
         # 2. 旧インスタンスの退避 (ForeignKeyなのでインスタンスごと保持)
         old_image_instance = playlist.image
 
@@ -342,15 +353,13 @@ class PlaylistService:
                         for artist in new_artists
                     ]
                     R_PlaylistArtist.objects.bulk_create(relations)
-            
+
             # 7. トラック紐付けの更新(洗替方式)
             if "tracks" in validated_data:
                 # 中間テーブルT_PlaylistArtistを物理削除
                 T_PlaylistTrack.objects.filter(playlist=playlist).delete()
 
-                tracks_data = validated_data[
-                    "tracks"
-                ]  # trackのリスト
+                tracks_data = validated_data["tracks"]  # trackのリスト
                 track_instances = [
                     T_PlaylistTrack(
                         playlist=playlist,
@@ -358,12 +367,12 @@ class PlaylistService:
                         created_method=kino_id,
                         updated_by=user,
                         updated_method=kino_id,
-                        **track
+                        **track,
                     )
                     for track in tracks_data
                 ]
                 T_PlaylistTrack.objects.bulk_create(track_instances)
-            
+
             # 8. 旧画像のクリーンアップ(成功後に実行)
             if old_image_instance:
                 # 物理ファイルの削除
@@ -371,7 +380,7 @@ class PlaylistService:
                     # ここで渡すのは`file_data.name`(相対パス)
                     # 例: "playlists/uuid.png"
                     self.storage_service.delete_file(old_image_instance.file_data.name)
-                
+
                 # DBレコードの削除(これにより紐付けが外れたレコードが残るのを防ぐ)
                 old_image_instance.delete()
 
@@ -394,17 +403,17 @@ class PlaylistService:
         # 自分のデータかつすでに削除されていないものを対象にする
         try:
             playlist: T_Playlist = T_Playlist.objects.select_for_update().get(
-                id=playlist_id, user=user, 
+                id=playlist_id,
+                user=user,
                 deleted_at__isnull=True,
             )
         except T_Playlist.DoesNotExist:
             raise PlaylistNotFoundError()
-        
+
         # 2. 関連データの整理
         # トラックの論理削除(先に行うことで、親がいなくなった後にトラックが浮くのを防ぐ)
         T_PlaylistTrack.objects.filter(
-            playlist=playlist, 
-            deleted_at__isnull=True
+            playlist=playlist, deleted_at__isnull=True
         ).update(
             updated_by=user,
             updated_method=kino_id,
@@ -440,10 +449,12 @@ class PlaylistService:
     ):
         """プレイリスト内のトラックを削除する"""
         # 1. プレイリストの存在チェック
-        playlist = T_Playlist.objects.filter(id=playlist_id, user=user, deleted_at__isnull=True).first()
+        playlist = T_Playlist.objects.filter(
+            id=playlist_id, user=user, deleted_at__isnull=True
+        ).first()
         if not playlist:
             raise PlaylistNotFoundError()
-        
+
         # 2. 対象の取得(プレイリストトラック/存在チェック)
         track = None
         try:
@@ -455,19 +466,65 @@ class PlaylistService:
             )
         except T_PlaylistTrack.DoesNotExist:
             raise PlaylistTrackNotFoundError()
-        
+
         # 3. 論理削除処理
         track.updated_by = user
         track.updated_method = kino_id
         track.deleted_at = date_now
         track.save()
-        
+
         # 4. 親プレイリストの更新(履歴管理のため)
         playlist.updated_by = user
         playlist.updated_method = kino_id
         playlist.save()
 
         return track
+
+    # プレイリストトラック削除
+    def remove_playlist_track(
+        self,
+        date_now: datetime,
+        kino_id: str,
+        user: M_User,
+        playlist_id: str,
+        track_id: str,
+    ):
+        """プレイリスト内のトラックを削除する"""
+        # 1. プレイリストの存在チェック
+        if not T_Playlist.objects.filter(
+            id=playlist_id, user=user, deleted_at__isnull=True
+        ).exists():
+            raise PlaylistNotFoundError()
+
+        # 2. 対象の取得(プレイリストトラック/存在チェック)
+        track = None
+        try:
+            track: T_PlaylistTrack = T_PlaylistTrack.objects.select_for_update().get(
+                id=track_id,
+                playlist_id=playlist_id,
+                deleted_at__isnull=True,
+            )
+        except T_PlaylistTrack.DoesNotExist:
+            raise PlaylistTrackNotFoundError()
+
+        # 3. 紐づくファイルリソース(画像)の削除
+        # スナップショット的に作成したものなので、トラック消滅と共に不要となる
+        if track.artist_spotify_image:
+            # ストレージ上の実ファイルがある場合はそれも消す
+            if track.artist_spotify_image.storage_path:
+                self.storage_service.delete_file(
+                    track.artist_spotify_image.storage_path
+                )
+
+            # FileResourceレコード自体の削除(物理削除でOKな場合)
+            track.artist_spotify_image.delete()
+
+        # 4. 論理削除処理
+        # deleted_at を入れることで、以降のfilter(deleted_at__isnull=True)から除外される
+        track.updated_by = user
+        track.updated_method = kino_id
+        track.deleted_at = date_now
+        track.save()
 
     # ------------------------------------------------------------------
     # その他サービス
@@ -496,7 +553,7 @@ class PlaylistService:
 
         # 2. SpotifyAPIで楽曲情報を一括取得
         spotify_ids = list(current_tracks.values_list("spotify_id", flat=True))
-        
+
         # 3. SpotifyAPIで楽曲情報を一括取得(fetch_get_tracksは内部でsp.tracksを使用)
         # ※一度に取得できる上限(通常50件)があるため、Service側で調整されている前提
         # latest_tracks_data = self.spotify_service.fetch_get_tracks(spotify_ids)
@@ -509,10 +566,7 @@ class PlaylistService:
         # 2026/4/19 fetch_get_tracksはSpotifyAPIにて使用不可の為、fetch_get_trackを並列実行させる形に変更
 
         # Noneを除外してマップ作成
-        latest_map = {
-            res["id"]: res 
-            for res in results if res and "id" in res
-        }
+        latest_map = {res["id"]: res for res in results if res and "id" in res}
 
         # 3. インスタンスの値を更新
         updated_tracks = []
@@ -520,47 +574,57 @@ class PlaylistService:
             latest = latest_map.get(db_track.spotify_id)
             if not latest:
                 continue
-            
+
             # APIレスポンスから必要なデータを抽出
             album = latest.get("album") or {}
 
             # 各種フィールドの同期
             db_track.spotify_name = latest.get("name", db_track.spotify_name)
-            db_track.spotify_isrc = latest.get("external_ids", {}).get("isrc", db_track.spotify_isrc)
-            db_track.spotify_artist_name = latest.get("artists", [{}])[0].get("name", db_track.spotify_artist_name)
-            
+            db_track.spotify_isrc = latest.get("external_ids", {}).get(
+                "isrc", db_track.spotify_isrc
+            )
+            db_track.spotify_artist_name = latest.get("artists", [{}])[0].get(
+                "name", db_track.spotify_artist_name
+            )
+
             # Noneなら0にする
             popularity = latest.get("popularity")
             db_track.spotify_popularity = popularity if popularity is not None else 0
-            
-            db_track.duration_ms = latest.get("duration_ms", db_track.spotify_duration_ms)
-            db_track.spotify_album_type = album.get("album_type", db_track.spotify_album_type)
+
+            db_track.duration_ms = latest.get(
+                "duration_ms", db_track.spotify_duration_ms
+            )
+            db_track.spotify_album_type = album.get(
+                "album_type", db_track.spotify_album_type
+            )
             db_track.spotify_album_id = album.get("id", db_track.spotify_album_id)
             db_track.spotify_album_name = album.get("name", db_track.spotify_album_name)
-            db_track.spotify_release_date = album.get("release_date", db_track.spotify_release_date)
+            db_track.spotify_release_date = album.get(
+                "release_date", db_track.spotify_release_date
+            )
 
             db_track.updated_by = user
             db_track.updated_method = kino_id
-            
+
             updated_tracks.append(db_track)
 
         # 4. bulk_updateで一括保存
         if updated_tracks:
             T_PlaylistTrack.objects.bulk_update(
-                updated_tracks, 
+                updated_tracks,
                 [
-                    "spotify_name", 
-                    "spotify_isrc", 
-                    "spotify_artist_name", 
-                    "spotify_popularity", 
+                    "spotify_name",
+                    "spotify_isrc",
+                    "spotify_artist_name",
+                    "spotify_popularity",
                     "spotify_duration_ms",
                     "spotify_album_type",
                     "spotify_album_id",
                     "spotify_album_name",
                     "spotify_release_date",
-                    "updated_by", 
-                    "updated_method"
-                ]
+                    "updated_by",
+                    "updated_method",
+                ],
             )
 
         # 5. プレイリスト本体の更新
@@ -582,7 +646,9 @@ class PlaylistService:
         # 1. パラメータを抽出
         pattern = validated_data["pattern"]
         track_count = validated_data["get_tracks_count"]
-        original_artists = validated_data["artists"] # リストではなくオブジェクトのリストとして受け取る
+        original_artists = validated_data[
+            "artists"
+        ]  # リストではなくオブジェクトのリストとして受け取る
         related_artists_count = validated_data["related_artists_count"]
 
         # 1. 処理対象アーティストリストの構築(オリジナル+関連アーティスト)
@@ -591,11 +657,11 @@ class PlaylistService:
         # オリジナルの追加
         for artist in original_artists:
             processing_queue.append(artist)
-        
+
         # 関連アーティストの集計処理
         # キー: アーティスト名, 値: スコア合計
         related_artist_scores = defaultdict(float)
-        
+
         # 既存のアーティスト名のリスト（除外用）
         original_names = {a["name"] for a in original_artists}
 
@@ -604,38 +670,42 @@ class PlaylistService:
             try:
                 artist_name = artist["name"]
                 # 1. LastFM側を検索し正式名称を取得
-                l_artist_name = self.lastfm_service.get_canonical_artist_name(artist_name)
+                l_artist_name = self.lastfm_service.get_canonical_artist_name(
+                    artist_name
+                )
                 if not l_artist_name:
                     continue
-                
+
                 # 関連アーティストを10件ずつ取得
                 # Last.fm APIの "match" フィールドを利用
-                l_artists = self.lastfm_service.get_similar_artists(l_artist_name, limit=10)
+                l_artists = self.lastfm_service.get_similar_artists(
+                    l_artist_name, limit=10
+                )
 
                 for l_artist in l_artists:
                     # 既に選択されているアーティストは関連として追加しない
                     if l_artist["name"] in original_names:
                         continue
-                    
+
                     # スコアを加算 (Last.fmの match は文字列の数値なのでfloatに変換)
                     score = float(l_artist.get("match", 0))
                     related_artist_scores[l_artist["name"]] += score
-            
+
             except Exception as e:
                 # ここでログを出して、失敗したアーティストはスキップし、次の処理へ継続
                 log_output_by_msg_id(
                     log_id="MSGW001",
-                    params=[f"Warning: Failed to fetch related artists for {artist['name']}: {str(e)}"],
+                    params=[
+                        f"Warning: Failed to fetch related artists for {artist['name']}: {str(e)}"
+                    ],
                     logger_name=LOG_METHOD.APPLICATION.value,
                 )
                 continue
-        
+
         # 2. スコアでソートして関連アーティストの上位を抽出
         # items = [("アーティスト名", スコア), ...]
         sorted_related = sorted(
-            related_artist_scores.items(), 
-            key=lambda x: x[1], 
-            reverse=True
+            related_artist_scores.items(), key=lambda x: x[1], reverse=True
         )
         top_related = sorted_related[:related_artists_count]
 
@@ -643,24 +713,30 @@ class PlaylistService:
         for name, score in top_related:
             try:
                 # Deezerで検索してIDを取得
-                deezer_results = self.deezer_service.fetch_search_artists(query=name, limit=1)
+                deezer_results = self.deezer_service.fetch_search_artists(
+                    query=name, limit=1
+                )
                 if not deezer_results:
                     continue
-                
+
                 # 検索結果をデータ構造に合わせて追加
                 deezer_artist = deezer_results[0]
-                processing_queue.append({
-                    "name": deezer_artist["name"],
-                    "deezer_id": str(deezer_artist["id"]),
-                    "setlistfm_mbid": None, # 必要に応じてMBID検索を行う
-                    "need_mbid_fetch": True
-                })
-            
+                processing_queue.append(
+                    {
+                        "name": deezer_artist["name"],
+                        "deezer_id": str(deezer_artist["id"]),
+                        "setlistfm_mbid": None,  # 必要に応じてMBID検索を行う
+                        "need_mbid_fetch": True,
+                    }
+                )
+
             except Exception as e:
                 # Deezer検索失敗時も、他のアーティスト処理を止めない
                 log_output_by_msg_id(
                     log_id="MSGW001",
-                    params=[f"Warning: Failed to fetch Deezer data for {name}: {str(e)}"],
+                    params=[
+                        f"Warning: Failed to fetch Deezer data for {name}: {str(e)}"
+                    ],
                     logger_name=LOG_METHOD.APPLICATION.value,
                 )
                 continue
@@ -678,13 +754,15 @@ class PlaylistService:
             if pattern == "top_tracks":
                 # DeezerAPI/人気曲の取得
                 tracks = self.deezer_service.fetch_get_artist_top_tracks(
-                    artist_deezer_id, 
+                    artist_deezer_id,
                     limit=track_count,
                 )
 
                 for d_track in tracks:
                     # DeezerAPI/曲の詳細情報を取得(ISRCが詳細データにしか存在しない)
-                    d_track_dtl = self.deezer_service.fetch_get_track(track_id=d_track["id"])
+                    d_track_dtl = self.deezer_service.fetch_get_track(
+                        track_id=d_track["id"]
+                    )
                     isrc = d_track_dtl.get("isrc")
                     if not isrc:
                         continue
@@ -699,32 +777,43 @@ class PlaylistService:
                         s_track = s_results[0]
                         popularity = s_track.get("popularity")
                         album = s_track.get("album") or {}
-                        artist_tracks.append(artist_tracks.append(self._format_spotify_track(s_track)))
-            
+                        artist_tracks.append(
+                            artist_tracks.append(self._format_spotify_track(s_track))
+                        )
+
             # B. 最近のセトリ(set_list)
             elif pattern == "set_list":
                 # MBID取得
                 mbid = artist.get("setlistfm_mbid")
-                
+
                 # 必要であればMusicBrainzから取り直し
                 if not mbid or artist.get("need_mbid_fetch"):
                     try:
-                        res = self.musicbrainz_service.get_artist_by_deezer_id(deezer_id=artist_deezer_id)
+                        res = self.musicbrainz_service.get_artist_by_deezer_id(
+                            deezer_id=artist_deezer_id
+                        )
                         mbid = res.get("mbid")
                     except Exception:
                         continue
-                
+
                 # mbidが取れなかった場合はスキップ
-                if not mbid: continue
+                if not mbid:
+                    continue
 
                 # 直近のセトリデータ取得
                 try:
-                    song_names = self.setlist_service.get_latest_setlist_by_mbid(mbid=mbid)
+                    song_names = self.setlist_service.get_latest_setlist_by_mbid(
+                        mbid=mbid
+                    )
                     for name in song_names[:track_count]:
                         query = f"track:{name} artist:{artist['name']}"
-                        search_results = self.spotify_service.fetch_search_tracks(query, limit=1)
+                        search_results = self.spotify_service.fetch_search_tracks(
+                            query, limit=1
+                        )
                         if search_results:
-                            artist_tracks.append(self._format_spotify_track(search_results[0]))
+                            artist_tracks.append(
+                                self._format_spotify_track(search_results[0])
+                            )
                 except Exception as e:
                     continue
 
@@ -732,7 +821,7 @@ class PlaylistService:
             all_tracks_data.extend(artist_tracks)
 
         return all_tracks_data
-    
+
     # トラック検索※SpotifyAPI使用
     def search_tracks(
         self,
@@ -761,29 +850,31 @@ class PlaylistService:
             spotify_query = f"artist:{search_artist_name}"
         else:
             return []
-        
+
         # 2. Spotify検索実行
         search_results = self.spotify_service.fetch_search_tracks(
             query=spotify_query,
             limit=limit,
         )
-        
+
         # 3. レスポンス形式の整形
         formatted_tracks = []
         for track in search_results:
             popularity = track.get("popularity")
             album = track.get("album") or {}
-            formatted_tracks.append({
-                "spotify_id": track.get("id"),
-                "spotify_name": track.get("name"),
-                "spotify_isrc": track.get("external_ids", {}).get("isrc"),
-                "spotify_artist_name": track.get("artists", [{}])[0].get("name"),
-                "spotify_popularity": popularity if popularity is not None else 0,
-                "spotify_duration_ms": track.get("duration_ms"),
-                "spotify_album_type": album.get("album_type"),
-                "spotify_album_id": album.get("id"),
-                "spotify_album_name": album.get("name"), 
-                "spotify_release_date": album.get("release_date"), 
-            })
+            formatted_tracks.append(
+                {
+                    "spotify_id": track.get("id"),
+                    "spotify_name": track.get("name"),
+                    "spotify_isrc": track.get("external_ids", {}).get("isrc"),
+                    "spotify_artist_name": track.get("artists", [{}])[0].get("name"),
+                    "spotify_popularity": popularity if popularity is not None else 0,
+                    "spotify_duration_ms": track.get("duration_ms"),
+                    "spotify_album_type": album.get("album_type"),
+                    "spotify_album_id": album.get("id"),
+                    "spotify_album_name": album.get("name"),
+                    "spotify_release_date": album.get("release_date"),
+                }
+            )
 
         return formatted_tracks
