@@ -97,6 +97,8 @@ class ArtistService:
         """
         関連するアーティスト一覧取得
         """
+        _lastfm_related_limit = 10
+        get_related_artists_count = validated_data.get("get_related_artists_count", 5)
         include_mbid = validated_data.get("include_mbid", False)
         # 1. 基本クエリ(自分かつ未削除)
         recent_artists = (
@@ -110,16 +112,18 @@ class ArtistService:
             .values("name", "lastfm_name")[:10]
         )
 
-        original_artists = list(recent_artists) + list(old_artists)
+        original_favorites = {
+            f["name"]: f for f in list(recent_artists) + list(old_artists)
+        }
+        original_artists = list(original_favorites.values())
 
-        # 関連アーティストの集計処理
-        # キー: アーティスト名, 値: スコア合計
+        # 関連アーティストの集計用
+        # キー: アーティスト名, 値  : スコア合計
         related_artist_scores = defaultdict(float)
-
-        # 既存のアーティスト名のリスト（除外用）
+        # 既存のアーティスト名のリスト(除外用)
         original_names = {a["name"] for a in original_artists}
 
-        # 関連アーティストの追加
+        # 2. 関連アーティストの算出
         for artist in original_artists:
             try:
                 artist_name = artist["name"]
@@ -130,10 +134,10 @@ class ArtistService:
                 if not l_artist_name:
                     continue
 
-                # 関連アーティストを10件ずつ取得
-                # Last.fm APIの "match" フィールドを利用
+                # 関連アーティストを取得
+                # Last.fm APIの"match"フィールドを利用
                 l_artists = self.lastfm_service.get_similar_artists(
-                    l_artist_name, limit=10
+                    l_artist_name, limit=_lastfm_related_limit
                 )
 
                 for l_artist in l_artists:
@@ -156,15 +160,15 @@ class ArtistService:
                 )
                 continue
 
-        # 2. スコアでソートして関連アーティストの上位5件を抽出
+        # 3. スコアでソートして関連アーティストの上位を抽出
         # items = [("アーティスト名", スコア), ...]
         sorted_related = sorted(
             related_artist_scores.items(), key=lambda x: x[1], reverse=True
         )
-        top_related = sorted_related[:5]
+        top_related = sorted_related[:get_related_artists_count]
 
         deezer_raw_list = []
-        # 3. 上位の関連アーティストをDeezerで検索して追加
+        # 4. 上位の関連アーティストをDeezerで検索し追加
         for name, score in top_related:
             try:
                 # Deezerで検索してIDを取得
@@ -191,7 +195,7 @@ class ArtistService:
         deezer_id_map = {str(item["id"]): item for item in deezer_raw_list}
         deezer_ids = list(deezer_id_map.keys())
 
-        # 3. MBID取得(必要な場合のみ)
+        # 5. MBID取得(必要な場合のみ)
         external_mbid_map = {}
         if include_mbid:
             for d_id in deezer_ids:
@@ -203,7 +207,7 @@ class ArtistService:
                 except ApplicationError:
                     external_mbid_map[d_id] = None
 
-        # 4. 生データに「is_registered」フラグ「mbid」をマージして整形
+        # 6. 生データに「is_registered」フラグ「mbid」をマージして整形
         formatted_results = []
         for d_id, item in deezer_id_map.items():
             formatted_results.append(
