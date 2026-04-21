@@ -2,6 +2,7 @@ import uuid
 
 from django.db import models
 from django.db.models import Q, UniqueConstraint
+from django.core.validators import MaxValueValidator, MinValueValidator
 
 # --- 共通モジュール ---
 from core.models import BaseModel
@@ -69,14 +70,6 @@ class T_Playlist(BaseModel):
         db_table_comment = "プレイリストトラン"
         verbose_name = "プレイリストトラン"
         verbose_name_plural = "プレイリストトラン"
-        constraints = [
-            # 同一ユーザ内に同一アーティストが重複して登録されるのを防ぐ（論理削除考慮）
-            # UniqueConstraint(
-            #     fields=["user", "spotify_id"],
-            #     condition=Q(deleted_at__isnull=True),
-            #     name="unique_t_playlist_user_spotify_id_active",
-            # ),
-        ]
 
     def __str__(self):
         return f"{self.title}"
@@ -87,6 +80,10 @@ class T_PlaylistTrack(BaseModel):
     """ユーザーが作成したプレイリストの管理"""
 
     # ---------- Consts ----------
+    class AlbumType(models.TextChoices):
+        ALBUM = "album", "Album"
+        SINGLE = "single", "Single"
+        COMPILATION = "compilation", "Compilation"
     # ---------- Fields ----------
     # ID(URLに使用される可能性もあるため、予測できないUUIDで保持する)
     id = models.UUIDField(
@@ -106,55 +103,90 @@ class T_PlaylistTrack(BaseModel):
         on_delete=models.CASCADE,
         related_name="playlist_t_playlist_track_set",
     )
-    # トラック名
-    name = models.CharField(
-        db_column="name",
-        verbose_name="トラック名",
-        db_comment="トラック名",
-        max_length=255,
-    )
     # Spotify/ID
     spotify_id = models.CharField(
         db_column="spotify_id",
         verbose_name="Spotify/ID",
         db_comment="Spotify/ID",
         max_length=255,
-        # blank=True,
-        # null=True,
     )
-    # アーティスト名
-    artist_name = models.CharField(
-        db_column="artist_name",
-        verbose_name="アーティスト名",
-        db_comment="アーティスト名",
+    # Spotifyトラック名
+    spotify_name = models.CharField(
+        db_column="spotify_name",
+        verbose_name="Spotifyトラック名",
+        db_comment="Spotifyトラック名",
         max_length=255,
     )
-    # アーティストSpotify/ID
-    artist_spotify_id = models.CharField(
-        db_column="artist_spotify_id",
-        verbose_name="アーティストSpotify/ID",
-        db_comment="アーティストSpotify/ID",
-        max_length=255,
-        # blank=True,
-        # null=True,
+    # Spotify/ISRC
+    spotify_isrc = models.CharField(
+        db_column="spotify_isrc",
+        verbose_name="Spotify/ISRC",
+        db_comment="Spotify/ISRC",
+        max_length=12,
     )
-    # アーティストSpotify画像(削除/物理削除の場合はCASCADE)
-    artist_spotify_image = models.ForeignKey(
-        "common.T_FileResource",
-        db_column="artist_spotify_image_id",
-        verbose_name="アーティストSpotify画像",
-        db_comment="アーティストSpotify画像",
-        on_delete=models.CASCADE,
-        related_name="artist_spotify_image_t_artist_set",
+    # Spotifyアーティスト名
+    spotify_artist_name = models.CharField(
+        db_column="spotify_artist_name",
+        verbose_name="Spotifyアーティスト名",
+        db_comment="Spotifyアーティスト名",
+        max_length=255,
+    )
+    # --------------------------------------------------
+    # その他トラックメタ情報
+    # --------------------------------------------------
+    # Spotify人気度
+    spotify_popularity = models.PositiveSmallIntegerField(
+        db_column="popularity",
+        verbose_name="Spotify人気度",
+        db_comment="Spotify人気度",
+        default=0,
+        validators=[
+            MinValueValidator(0),
+            MaxValueValidator(100),
+        ],
+    )
+    # Spotify再生時間(ms)
+    spotify_duration_ms = models.PositiveIntegerField(
+        db_column="spotify_duration_ms",
+        verbose_name="Spotify再生時間(ms)",
+        db_comment="Spotify再生時間(ms)",
         null=True,
         blank=True,
     )
-    # アーティストジャンル
-    artist_genres = models.JSONField(
-        db_column="artist_genres",
-        verbose_name="アーティストジャンル",
-        db_comment="アーティストジャンル",
-        default=list,
+    # Spotifyアルバム種別
+    spotify_album_type = models.CharField(
+        db_column="spotify_album_type",
+        verbose_name="Spotifyアルバム種別",
+        db_comment="Spotifyアルバム種別",
+        choices=AlbumType.choices,
+        null=True,
+        blank=True,
+    )
+    # SpotifyアルバムID
+    spotify_album_id = models.CharField(
+        db_column="spotify_album_id",
+        verbose_name="SpotifyアルバムID",
+        db_comment="SpotifyアルバムID",
+        max_length=255,
+        null=True,
+        blank=True,
+    )
+    # Spotifyアルバム名
+    spotify_album_name = models.CharField(
+        db_column="spotify_album_name",
+        verbose_name="Spotifyアルバム名",
+        db_comment="Spotifyアルバム名",
+        max_length=255,
+        null=True,
+        blank=True,
+    )
+    # Spotifyリリース日(Spotifyは「2023」「2023-01」「2023-01-01」など形式が混在するためChar推奨)
+    spotify_release_date = models.CharField(
+        db_column="spotify_release_date",
+        verbose_name="Spotifyリリース日",
+        db_comment="Spotifyリリース日",
+        max_length=20,
+        null=True,
         blank=True,
     )
 
@@ -177,4 +209,4 @@ class T_PlaylistTrack(BaseModel):
         ]
 
     def __str__(self):
-        return f"{self.spotify_id}"
+        return f"{self.spotify_id} {self.spotify_name}"

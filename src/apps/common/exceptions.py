@@ -80,3 +80,31 @@ class SetlistNotFoundError(CommonError):
     message_id = "ERR_COM_401"
     message = "Setlist Not Found"
     detail = "該当するセットリストが見つかりませんでした。"
+
+class SetlistFmAPIAuthFailedException(CommonError):
+    """Setlist.fm側の認証エラー"""
+    status_code = status.HTTP_401_UNAUTHORIZED
+    message_id = "ERR_COM_402"
+    detail = "Setlist.fmの認証に失敗しました。"
+
+# --------------------------------------------------
+# Deezer接続系 (Spotifyと混同しないよう分ける)
+# --------------------------------------------------
+
+class DeezerAuthFailedException(CommonError):
+    """Deezer側の認証エラー"""
+    status_code = status.HTTP_401_UNAUTHORIZED
+    message_id = "ERR_COM_501"
+    detail = "Deezerの認証に失敗しました。"
+
+class DeezerApiLimitException(CommonError):
+    """Deezerのレート制限(429)"""
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    message_id = "ERR_COM_502"
+    detail = "Deezer APIの利用制限を超えました。"
+
+class DeezerPermissionDeniedException(CommonError):
+    """403 Forbidden用"""
+    status_code = status.HTTP_403_FORBIDDEN
+    message_id = "ERR_COM_503"
+    detail = "Deezer APIへのアクセス権限がありません。"

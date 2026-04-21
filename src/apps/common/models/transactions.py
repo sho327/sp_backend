@@ -10,99 +10,6 @@ from simple_history.models import HistoricalRecords
 # --- 共通モジュール ---
 from core.models import BaseModel
 
-# SpotifyUserトークントラン
-class T_SpotifyUserToken(BaseModel):
-    # ---------- Consts ----------
-    # ---------- Fields ----------
-    # ID
-    id = models.UUIDField(
-        db_column="id",
-        verbose_name="ID",
-        db_comment="ID",
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False,
-    )
-    # メールアドレス
-    email = models.EmailField(
-        db_column="email",
-        verbose_name="メールアドレス",
-        db_comment="メールアドレス",
-        max_length=254,  # RFC推奨の長さ設定
-    )
-    # アクセストークン
-    access_token = models.TextField(
-        db_column="access_token",
-        verbose_name="アクセストークン",
-        db_comment="アクセストークン",
-    )
-    # リフレッシュトークン
-    refresh_token = models.TextField(
-        db_column="refresh_token",
-        verbose_name="リフレッシュトークン",
-        db_comment="リフレッシュトークン",
-    )
-    # トークン有効期限
-    expired_at = models.DateTimeField(
-        db_column="expired_at",
-        verbose_name="トークン有効期限",
-        db_comment="トークン有効期限",
-    )
-    # リフレッシュロックフラグ
-    refreshing = models.BooleanField(
-        db_column="refreshing",
-        verbose_name="リフレッシュロックフラグ",
-        db_comment="リフレッシュロックフラグ",
-        default=False,
-    )
-    # リフレッシュ更新ロック期限
-    refreshing_until = models.DateTimeField(
-        db_column="refreshing_until",
-        verbose_name="リフレッシュ更新ロック期限",
-        db_comment="リフレッシュ更新ロック期限",
-        null=True,
-        blank=True,
-    )
-
-    def is_expired(self):
-        return timezone.now() >= self.expires_at
-
-    def should_refresh(self):
-        # 5分前に更新
-        return timezone.now() >= self.expires_at - timedelta(minutes=5)
-
-    def is_refreshing(self):
-        if not self.refreshing:
-            return False
-
-        if self.refreshing_until and timezone.now() > self.refreshing_until:
-            return False
-
-        return True
-
-    # django-simple-historyを使用
-    # history = HistoricalRecords()
-
-    # テーブル名
-    class Meta:
-        db_table = "t_spotify_user_token"
-        db_table_comment = "SpotifyUserトークントラン"
-        verbose_name = "SpotifyUserトークントラン"
-        verbose_name_plural = "SpotifyUserトークントラン"
-        constraints = [
-            # 未削除のトークン間でのみemailをユニークにする
-            # (M_User/T_Profileが必ず作られたユーザで認証するわけではないのでキーとしてはemailで管理※基本システムユーザのみ)
-            UniqueConstraint(
-                fields=["email"],
-                condition=Q(deleted_at__isnull=True),
-                name="unique_t_spotify_user_token_access_token_refresh_token_active",
-            ),
-        ]
-
-    def __str__(self):
-        return f"{self.access_token[:10]}..."
-
-
 class T_AbstractAttachment(BaseModel):
     # ファイルリソース(削除/物理削除の場合はCASCADE)
     file_resource = models.ForeignKey(
@@ -178,7 +85,7 @@ class T_FileResource(BaseModel):
         null=True,
         blank=True,
     )
-    # 外部URL(Spotifyの画像)
+    # 外部URL(Spotify/Deezerの画像)
     external_url = models.URLField(
         db_column="external_url",
         verbose_name="外部URL",

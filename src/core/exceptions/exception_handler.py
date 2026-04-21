@@ -1,6 +1,5 @@
 from datetime import datetime
 from rest_framework.views import exception_handler
-from rest_framework.response import Response
 from rest_framework import status
 from core.consts import LOG_METHOD
 from core.utils.log_helpers import log_output_by_msg_id
@@ -43,9 +42,10 @@ def custom_exception_handler(exc, context):
         formatted_data["description"] = str(exc.detail)
     
     # 4. ValidationError(DRF標準)の場合の微調整
-    elif response.status_code == status.HTTP_400_BAD_REQUEST:
-        formatted_data["message"] = "入力内容に誤りがあります。"
-        formatted_data["message_id"] = "ERR_VALIDATION"
+    # ※このルートは基本的に使用されない(view側でtry/exceptで囲む)
+    # elif response.status_code == status.HTTP_400_BAD_REQUEST:
+    #     formatted_data["message"] = "入力内容に誤りがあります。"
+    #     formatted_data["message_id"] = "ERR_VALIDATION"
 
     # 最終的なデータをresponse.dataにセット
     response.data = formatted_data

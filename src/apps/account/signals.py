@@ -23,7 +23,7 @@ def create_profile(sender, instance: M_User, created, **kwargs):
             bio=None,
             icon=None,
             is_setup_completed=False,
-            status_code=T_Profile.AccountStatues.ACTIVE,
+            status_code=T_Profile.AccountStatus.ACTIVE,
             locked_until_at=None,
             created_by=instance,
             created_method="signal-create-profile",

@@ -1,13 +1,13 @@
 from django.utils import timezone
 from rest_framework import viewsets
 from django.http import Http404
-from rest_framework.exceptions import APIException
+from rest_framework.exceptions import APIException, ValidationError as DRF_ValidationError
 
 # --- コアモジュール ---
 from core.decorators.logging_process_with_sql import logging_process_with_sql
 from core.consts import LOG_METHOD
 from core.utils.log_helpers import log_output_by_msg_id
-from core.exceptions.exceptions import ApplicationError
+from core.exceptions.exceptions import ApplicationError, ValidationError
 from core.views import CommonResponseMixin
 
 # --- アーティストモジュール ---
@@ -32,7 +32,7 @@ class M_ArtistTagViewSet(CommonResponseMixin, viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(
             created_by=self.request.user,
-            create_method=f"{KINO_ID_BASE}_create",
+            created_method=f"{KINO_ID_BASE}_create",
             updated_by=self.request.user,
             updated_method=f"{KINO_ID_BASE}_create"
         )
@@ -51,35 +51,35 @@ class M_ArtistTagViewSet(CommonResponseMixin, viewsets.ModelViewSet):
         instance.save()
 
     # ------------------------------------------------------------------
-    # 一覧取得 (GET /api/model-m_artist_tags/)
+    # 一覧取得 (GET /master_artist_tags/)
     # ------------------------------------------------------------------
     @logging_process_with_sql
     def list(self, request, *args, **kwargs):
         return self._execute_action(super().list, request, *args, **kwargs)
 
     # ------------------------------------------------------------------
-    # 登録 (POST /api/model-m_artist_tags/)
+    # 登録 (POST /master_artist_tags/)
     # ------------------------------------------------------------------
     @logging_process_with_sql
     def create(self, request, *args, **kwargs):
         return self._execute_action(super().create, request, *args, **kwargs)
 
     # ------------------------------------------------------------------
-    # 詳細取得 (GET /api/model-m_artist_tags/{id}/)
+    # 詳細取得 (GET /master_artist_tags/{id}/)
     # ------------------------------------------------------------------
     @logging_process_with_sql
     def retrieve(self, request, *args, **kwargs):
         return self._execute_action(super().retrieve, request, *args, **kwargs)
 
     # ------------------------------------------------------------------
-    # 更新 (PUT/PATCH /api/model-m_artist_tags/{id}/)
+    # 更新 (PUT/PATCH /master_artist_tags/{id}/)
     # ------------------------------------------------------------------
     @logging_process_with_sql
     def update(self, request, *args, **kwargs):
         return self._execute_action(super().update, request, *args, **kwargs)
 
     # ------------------------------------------------------------------
-    # 削除 (DELETE /api/model-m_artist_tags/{id}/)
+    # 削除 (DELETE /master_artist_tags/{id}/)
     # ------------------------------------------------------------------
     @logging_process_with_sql
     def destroy(self, request, *args, **kwargs):
@@ -120,9 +120,12 @@ class M_ArtistTagViewSet(CommonResponseMixin, viewsets.ModelViewSet):
             return response
 
         except (ApplicationError, APIException, Http404):
-            # これらはDRFやカスタムハンドラが適切なコード(404, 403等)を返すべきものなので
-            # そのまま親へスローする
+            # ApplicationError関連はカスタムエラー処理が設定されている為そのまま親へスローする
+            # これらはDRFやカスタムハンドラが適切なコード(404, 403等)を返すべきものなのでそのまま親へスローする
             raise
+        except DRF_ValidationError as e:
+            # DRFバリデーションエラーは専用エラーに差し替える
+            raise ValidationError() from e
         except Exception as e:
-            # 想定外エラーのラップ
+            # その他想定外エラーの場合もAPIエラーとする
             raise ApplicationError() from e

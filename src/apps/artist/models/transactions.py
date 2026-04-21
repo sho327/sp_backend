@@ -7,9 +7,11 @@ from simple_history.models import HistoricalRecords
 # --- コアモジュール ---
 from core.models import BaseModel
 
+
 # アーティストトラン
 class T_Artist(BaseModel):
     """登録したアーティストの情報(名称や画像はSpotifyより取得)"""
+
     # ---------- Consts ----------
     # ---------- Fields ----------
     # ID(URLに使用される可能性もあるため、予測できないUUIDで保持する)
@@ -31,11 +33,11 @@ class T_Artist(BaseModel):
         # 逆参照名を定義(例: 「参照先インスタンス.[related_name]」/通常参照は「本インスタンス.参照先モデル名(_id)」で取得可能)
         related_name="user_t_artist_set",  # 役割_[複数形]ルール
     )
-    # Spotify/ID
-    spotify_id = models.CharField(
-        db_column="spotify_id",
-        verbose_name="Spotify/ID",
-        db_comment="Spotify/ID",
+    # Deezer/ID
+    deezer_id = models.CharField(
+        db_column="deezer_id",
+        verbose_name="Deezer/ID",
+        db_comment="Deezer/ID",
         max_length=255,
     )
     # アーティスト名
@@ -45,14 +47,14 @@ class T_Artist(BaseModel):
         db_comment="アーティスト名",
         max_length=255,
     )
-    # Spotify画像(削除/物理削除の場合はCASCADE)
-    spotify_image = models.ForeignKey(
+    # Deezer画像(削除/物理削除の場合はCASCADE)
+    deezer_image = models.ForeignKey(
         "common.T_FileResource",
-        db_column="spotify_image_id",
-        verbose_name="Spotify画像",
-        db_comment="Spotify画像",
+        db_column="deezer_image_id",
+        verbose_name="Deezer画像",
+        db_comment="Deezer画像",
         on_delete=models.CASCADE,
-        related_name="spotify_image_t_artist_set",
+        related_name="deezer_image_t_artist_set",
         null=True,
         blank=True,
     )
@@ -86,14 +88,6 @@ class T_Artist(BaseModel):
         null=True,
         blank=True,
     )
-    # ジャンル
-    genres = models.JSONField(
-        db_column="genres",
-        verbose_name="ジャンル",
-        db_comment="ジャンル",
-        default=list,
-        blank=True,
-    )
     # タグ
     tags = models.ManyToManyField(
         "artist.M_ArtistTag",  # 循環参照対策(文字で定義することで、後での紐付けとする)
@@ -104,7 +98,6 @@ class T_Artist(BaseModel):
         # 逆参照名を定義(例: 「参照先インスタンス.[related_name]」/通常参照は「本インスタンス.参照先モデル名(_id)」で取得可能)
         related_name="tags_t_artist_set",
     )
-    
 
     # django-simple-historyを使用
     # history = HistoricalRecords()
@@ -118,11 +111,11 @@ class T_Artist(BaseModel):
         constraints = [
             # 同一ユーザ内に同一アーティストが重複して登録されるのを防ぐ（論理削除考慮）
             UniqueConstraint(
-                fields=["user", "spotify_id"],
+                fields=["user", "deezer_id"],
                 condition=Q(deleted_at__isnull=True),
-                name="unique_t_artist_user_sporify_id_active",
+                name="unique_t_artist_user_deezer_id_active",
             ),
         ]
 
     def __str__(self):
-        return f"{self.name} ({self.spotify_id})"
+        return f"{self.name} ({self.deezer_id})"

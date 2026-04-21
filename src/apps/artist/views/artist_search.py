@@ -1,13 +1,14 @@
 from datetime import datetime
 from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError as DRF_ValidationError
 
 # --- コアモジュール ---
 from core.decorators.logging_process_with_sql import logging_process_with_sql
 from core.consts import LOG_METHOD
 from core.utils.log_helpers import log_output_by_msg_id
 from core.utils.date_format import convert_to_site_timezone
-from core.exceptions.exceptions import ApplicationError
+from core.exceptions.exceptions import ApplicationError, ValidationError
 from core.views import BaseAPIView
 
 # --- アーティストモジュール ---
@@ -42,8 +43,13 @@ class ArtistSearchView(BaseAPIView):
         try:
             return self.artist_search(request, *args, **kwargs)
         except ApplicationError:
+            # ApplicationError関連はカスタムエラー処理が設定されている為そのまま親へスローする
             raise
+        except DRF_ValidationError as e:
+            # DRFバリデーションエラーは専用エラーに差し替える
+            raise ValidationError() from e
         except Exception as e:
+            # その他想定外エラーの場合もAPIエラーとする
             raise ApplicationError() from e
     
     def artist_search(self, request, *args, **kwargs):
@@ -64,15 +70,13 @@ class ArtistSearchView(BaseAPIView):
         # GETなのでrequest.query_paramsを渡す
         serializer = ArtistSearchRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
-        # リクエストデータ変数化
-        q = serializer.validated_data.get("q")
-        limit = serializer.validated_data.get("limit")
-        
-        # 3. サービス実行(アーティスト検索)※SpotifyAPI使用
+
+        # 3. サービス実行(アーティスト検索)※DeezerAPI使用
         raw_results = self.artist_service.search_artist(
+            date_now=date_now,
+            kino_id=KINO_ID,
             user=request.user,
-            query=q,
-            limit=limit,
+            validated_data=serializer.validated_data,
         )
 
         # 4. レスポンス作成(Mini構成を使用)
@@ -91,5 +95,4 @@ class ArtistSearchView(BaseAPIView):
             logger_name=LOG_METHOD.APPLICATION.value
         )
         
-        # 8. レスポンス返却
         return response

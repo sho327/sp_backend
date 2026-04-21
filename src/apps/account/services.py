@@ -45,7 +45,7 @@ class AccountService:
     def _create_user_token(
         self, 
         user: M_User, 
-        token_type: T_UserToken.TokenTypes, 
+        token_type: T_UserToken.TokenType, 
         date_now: datetime,
         kino_id: str, 
         expires_hours: int = 24,
@@ -103,7 +103,7 @@ class AccountService:
     # ------------------------------------------------------------------
     def _count_or_lock_login_failure(self, date_now: datetime, kino_id: str, user: M_User | None, email :str, ip_address: str | None, user_agent: str | None):
         # 履歴を保存
-        self._save_login_history(kino_id, user, email, False, T_LoginHistory.FailureReasons.PASSWORD_MISMATCH, ip_address, user_agent)
+        self._save_login_history(kino_id, user, email, False, T_LoginHistory.FailureReason.PASSWORD_MISMATCH, ip_address, user_agent)
         
         # 直近15分以内の失敗回数をカウント(例: 5回でロック)
         recent_failures = T_LoginHistory.objects.filter(
@@ -114,7 +114,7 @@ class AccountService:
 
         if recent_failures >= 5:
             t_profile_instance: T_Profile = user.user_t_profile_set
-            t_profile_instance.status_code = T_Profile.AccountStatues.TEMPORARY_LOCKED
+            t_profile_instance.status_code = T_Profile.AccountStatus.TEMPORARY_LOCKED
             t_profile_instance.locked_until_at = date_now + timezone.timedelta(minutes=30) # 30分ロック
             t_profile_instance.updated_by = user
             t_profile_instance.updated_method = kino_id
@@ -172,7 +172,7 @@ class AccountService:
         # 内部からエラーが投げられた場合、config.settings設定に沿って、ロールバックさせる
         raw_token: T_UserToken = self._create_user_token(
             user=m_user_instance, 
-            token_type=T_UserToken.TokenTypes.ACTIVATION, 
+            token_type=T_UserToken.TokenType.ACTIVATION, 
             date_now=date_now,
             kino_id=kino_id,
         )
@@ -207,7 +207,7 @@ class AccountService:
         # 2. 条件に合うトークンの検索(ハッシュ値、種別、未期限切れ、未削除を条件とする)
         t_user_token_instance: T_UserToken = T_UserToken.objects.filter(
             token_hash=token_hash,
-            token_type=T_UserToken.TokenTypes.ACTIVATION,
+            token_type=T_UserToken.TokenType.ACTIVATION,
             expired_at__gt=date_now,  # 現在時刻より期限が未来であること
             deleted_at__isnull=True,
         ).first()
@@ -266,19 +266,19 @@ class AccountService:
             t_profile_instance: T_Profile = getattr(m_user_instance1, 'user_t_profile_set', None)
             
             # A. ステータスによる永続的な拒否(退会済み・凍結)
-            if t_profile_instance and t_profile_instance.status_code in [T_Profile.AccountStatues.FROZEN, T_Profile.AccountStatues.WITHDRAWN]:
-                self._save_login_history(kino_id, m_user_instance1, email, False, T_LoginHistory.FailureReasons.LOCKED, ip_address, user_agent)
+            if t_profile_instance and t_profile_instance.status_code in [T_Profile.AccountStatus.FROZEN, T_Profile.AccountStatus.WITHDRAWN]:
+                self._save_login_history(kino_id, m_user_instance1, email, False, T_LoginHistory.FailureReason.LOCKED, ip_address, user_agent)
                 raise AccountLockedError()
             
             # B. 一時ロックの期限チェック
-            if t_profile_instance and t_profile_instance.status_code == T_Profile.AccountStatues.TEMPORARY_LOCKED:
+            if t_profile_instance and t_profile_instance.status_code == T_Profile.AccountStatus.TEMPORARY_LOCKED:
                 if t_profile_instance.locked_until_at and t_profile_instance.locked_until_at > date_now:
-                    self._save_login_history(kino_id, m_user_instance1, email, False, T_LoginHistory.FailureReasons.LOCKED, ip_address, user_agent)
+                    self._save_login_history(kino_id, m_user_instance1, email, False, T_LoginHistory.FailureReason.LOCKED, ip_address, user_agent)
                     raise AccountLockedError()
             
             # C. ロック・対応済み・凍結の場合以外(メール認証待ちユーザからのログイン等)で未アクティブの場合もエラーとする
             if not m_user_instance1.is_active:
-                self._save_login_history(kino_id, m_user_instance1, email, False, T_LoginHistory.FailureReasons.NOT_ACTIVATED, ip_address, user_agent)
+                self._save_login_history(kino_id, m_user_instance1, email, False, T_LoginHistory.FailureReason.NOT_ACTIVATED, ip_address, user_agent)
                 raise AuthenticationFailedError()
 
         # 2. 認証実行
@@ -290,7 +290,7 @@ class AccountService:
                     self._count_or_lock_login_failure(date_now, kino_id, m_user_instance1, email, ip_address, user_agent)
                 else:
                     # 存在しないユーザーの場合も履歴だけ残す
-                    self._save_login_history(kino_id, None, email, False, T_LoginHistory.FailureReasons.PASSWORD_MISMATCH, ip_address, user_agent)
+                    self._save_login_history(kino_id, None, email, False, T_LoginHistory.FailureReason.PASSWORD_MISMATCH, ip_address, user_agent)
             except Exception as e:
                 # 履歴保存自体のエラーでログインエラーが上書きされないようにログのみ
                 log_output_by_msg_id(log_id="MSGE001", params=[f"Failed to save login history: {str(e)}"], logger_name=LOG_METHOD.APPLICATION.value)
@@ -305,8 +305,8 @@ class AccountService:
                 update_last_login(None, m_user_instance2)
                 
                 # B. ロック解除(必要な場合のみ)
-                if t_profile_instance and t_profile_instance.status_code == T_Profile.AccountStatues.TEMPORARY_LOCKED:
-                    t_profile_instance.status_code = T_Profile.AccountStatues.ACTIVE
+                if t_profile_instance and t_profile_instance.status_code == T_Profile.AccountStatus.TEMPORARY_LOCKED:
+                    t_profile_instance.status_code = T_Profile.AccountStatus.ACTIVE
                     t_profile_instance.locked_until_at = None
                     t_profile_instance.updated_by = m_user_instance2
                     t_profile_instance.updated_method = kino_id
@@ -355,7 +355,7 @@ class AccountService:
         one_minute_ago = date_now - timezone.timedelta(minutes=1)
         recent_token_exists = T_UserToken.objects.filter(
             user=m_user_instance,
-            token_type=T_UserToken.TokenTypes.PASSWORD_RESET,
+            token_type=T_UserToken.TokenType.PASSWORD_RESET,
             created_at__gt=one_minute_ago,
             deleted_at__isnull=True
         ).exists()
@@ -367,7 +367,7 @@ class AccountService:
         # 3. 共通メソッドでリセット用トークンを発行(有効期限は短めの1時間など)
         raw_token = self._create_user_token(
             user=m_user_instance,
-            token_type=T_UserToken.TokenTypes.PASSWORD_RESET,
+            token_type=T_UserToken.TokenType.PASSWORD_RESET,
             date_now=date_now,
             kino_id=kino_id,
             expires_hours=1,
@@ -409,7 +409,7 @@ class AccountService:
         # 2. トークンを検索（ハッシュ値、種別、未期限切れ、未削除を条件とする）
         t_user_token_instance: T_UserToken = T_UserToken.objects.filter(
             token_hash=token_hash,
-            token_type=T_UserToken.TokenTypes.PASSWORD_RESET,
+            token_type=T_UserToken.TokenType.PASSWORD_RESET,
             expired_at__gt=date_now,  # 現在時刻より期限が未来であること
             deleted_at__isnull=True,
         ).first()
@@ -440,7 +440,7 @@ class AccountService:
         # ▼ 実現方法 1: リフレッシュトークンの削除 (推奨/ソフトコミット)
         #    T_UserTokenにリフレッシュトークンを保存している場合、
         #    そのユーザーIDに紐づく全てのリフレッシュトークンを削除する。
-        #    # self.token_repo.invalidate_tokens_by_user(user, TokenTypes.REFRESH)
+        #    # self.token_repo.invalidate_tokens_by_user(user, TokenType.REFRESH)
 
         # ▼ 実現方法 2: JWTアクセストークンのブラックリスト化 (即時切断/負荷高)
         #    SimpleJWTのブラックリスト機能（通常Redisなどのキャッシュを使用）を利用し、

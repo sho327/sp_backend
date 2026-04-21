@@ -50,7 +50,7 @@ class TestLoginView:
         # 失敗履歴の確認
         history = T_LoginHistory.objects.filter(login_identifier=user.email).last()
         assert history.is_successful is False
-        assert history.failure_reason == T_LoginHistory.FailureReasons.PASSWORD_MISMATCH
+        assert history.failure_reason == T_LoginHistory.FailureReason.PASSWORD_MISMATCH
 
     def test_login_lockout_after_5_failures(self, client, login_url):
         """5回失敗後のアカウントロックテスト"""
@@ -63,7 +63,7 @@ class TestLoginView:
 
         # プロフィールが一時ロック状態になっているか確認
         profile = T_Profile.objects.get(user=user)
-        assert profile.status_code == T_Profile.AccountStatues.TEMPORARY_LOCKED
+        assert profile.status_code == T_Profile.AccountStatus.TEMPORARY_LOCKED
         assert profile.locked_until_at is not None
 
         # 6回目の試行はロックエラーになるはず
@@ -81,4 +81,4 @@ class TestLoginView:
         
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         history = T_LoginHistory.objects.filter(user=user).last()
-        assert history.failure_reason == T_LoginHistory.FailureReasons.NOT_ACTIVATED
+        assert history.failure_reason == T_LoginHistory.FailureReason.NOT_ACTIVATED

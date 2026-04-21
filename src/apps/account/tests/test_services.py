@@ -36,7 +36,7 @@ class TestAccountService:
 
         token = service._create_user_token(
             user=user, 
-            token_type=T_UserToken.TokenTypes.ACTIVATION, 
+            token_type=T_UserToken.TokenType.ACTIVATION, 
             date_now=timezone.now(), 
             kino_id="test"
         )

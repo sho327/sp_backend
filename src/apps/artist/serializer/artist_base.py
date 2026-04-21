@@ -2,7 +2,7 @@ from rest_framework import serializers
 from apps.artist.models import T_Artist
 from apps.artist.serializer.master_artist_tag_base import MasterArtistTagMiniResponseSerializer
 from apps.artist.serializer.master_artist_context_base import MasterArtistContextMiniResponseSerializer
-from apps.common.serializer.file_resource_base import FileResourceFullResponseSerializer
+from apps.common.serializer.file_resource_base import FileResourceMiniResponseSerializer
 
 class ArtistBaseSerializer(serializers.ModelSerializer):
     """
@@ -19,13 +19,21 @@ class ArtistMiniResponseSerializer(ArtistBaseSerializer):
     一覧で必要な項目(画像URLなど)だけを抽出。
     """
     # 外部キー対象のURLだけ取得させる
-    # source='spotify_image.url' とすることで、
+    # source='deezer_image.url' とすることで、
     # 階層を下げずに image_url というキーで直接文字列を返せる
-    image_url = serializers.ReadOnlyField(source='spotify_image.url')
+    image_url = serializers.ReadOnlyField(source='deezer_image.url')
     tags = MasterArtistTagMiniResponseSerializer(many=True, read_only=True)
 
     class Meta(ArtistBaseSerializer.Meta):
-        fields = ["id", "name", "spotify_id", "image_url", "setlistfm_mbid", "is_mbid_autoset", "tags"]
+        fields = [
+            "id", 
+            "name", 
+            "deezer_id", 
+            "image_url", 
+            # "setlistfm_mbid", 
+            # "is_mbid_autoset", 
+            "tags"
+        ]
 
 class ArtistFullResponseSerializer(ArtistBaseSerializer):
     """
@@ -36,7 +44,7 @@ class ArtistFullResponseSerializer(ArtistBaseSerializer):
     # Mini系のシリアライザを再利用し中身を展開
     context = MasterArtistContextMiniResponseSerializer(read_only=True)
     tags = MasterArtistTagMiniResponseSerializer(many=True, read_only=True)
-    spotify_image = FileResourceFullResponseSerializer(read_only=True)
+    deezer_image = FileResourceMiniResponseSerializer(read_only=True)
 
     class Meta(ArtistBaseSerializer.Meta):
         # Baseの fields = '__all__' を継承。

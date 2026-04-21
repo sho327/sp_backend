@@ -7,11 +7,15 @@ class ArtistCreateRequestSerializer(serializers.Serializer):
     """
     入力：フロントエンドから送られてくるデータの検品
     """
-    spotify_id = serializers.CharField(required=True)
+    deezer_id = serializers.CharField(required=True)
     name = serializers.CharField(required=True)
     image_url = serializers.URLField(required=False, allow_null=True)
+    
+    # required=Falseではあるが検索で返す予定なので基本的に設定したい
+    # ※検索が重くなりすぎれば、自動登録を使う
     setlistfm_mbid = serializers.CharField(required=False, allow_null=True)
-    is_mbid_autoset = serializers.BooleanField(required=False, allow_null=True)
+    is_mbid_autoset = serializers.BooleanField(required=False)
+
     # ※PrimaryKeyRelatedFieldを利用
     # serializers.PrimaryKeyRelatedFieldのqueryset にフィルタをかけている場合、
     # DRFはバリデーション時(is_valid()実行時)に以下の挙動を行う
@@ -27,8 +31,8 @@ class ArtistCreateRequestSerializer(serializers.Serializer):
         many=True,
         required=False,
     )
-    genres = serializers.ListField(
-        child=serializers.CharField(),
-        required=False,
-        default=[]
-    )
+    # genres = serializers.ListField(
+    #     child=serializers.CharField(),
+    #     required=False,
+    #     default=[]
+    # )

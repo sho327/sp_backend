@@ -23,6 +23,6 @@ class UserTokenFactory(factory.django.DjangoModelFactory):
         model = T_UserToken
 
     user = factory.SubFactory(UserFactory)
-    token_type = T_UserToken.TokenTypes.ACTIVATION
+    token_type = T_UserToken.TokenType.ACTIVATION
     token_hash = factory.Faker("sha256")
     expired_at = factory.LazyFunction(lambda: timezone.now() + timezone.timedelta(hours=24))

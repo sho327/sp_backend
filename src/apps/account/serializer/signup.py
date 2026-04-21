@@ -12,7 +12,7 @@ class SignupRequestSerializer(serializers.Serializer):
         required=True, 
         write_only=True, 
         style={'input_type': 'password'},
-        min_length=8,
+        # min_length=8,
         help_text="パスワード"
     )
 

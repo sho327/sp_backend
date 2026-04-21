@@ -8,10 +8,9 @@ class ArtistUpdateRequestSerializer(serializers.Serializer):
     入力：フロントエンドから送られてくるデータの検品
     """
     # 更新可能な項目のみ定義(すべて任意項目にすることでPATCHに対応)
-    # Spotifyの画像URLが送られてこない(画像更新なし)も許容するためrequired=False
+    # 画像についてはSpotify検索結果が正なので、通常変更する想定はないが、直API実行等で一応差し替えれるように入れておく
     spotify_image_url = serializers.URLField(required=False, allow_null=True)
     setlistfm_mbid = serializers.CharField(required=False, allow_null=True)
-    is_mbid_autoset = serializers.BooleanField(required=False, allow_null=True)
     # ※PrimaryKeyRelatedFieldを利用
     # serializers.PrimaryKeyRelatedFieldのqueryset にフィルタをかけている場合、
     # DRFはバリデーション時(is_valid()実行時)に以下の挙動を行う

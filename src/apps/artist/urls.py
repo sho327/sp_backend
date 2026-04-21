@@ -15,8 +15,8 @@ from apps.artist.views.artist_search import ArtistSearchView
 app_name = "artist"
 
 router = routers.DefaultRouter()
-router.register("master_tags", M_ArtistTagViewSet, basename='master_artist_tag')
-router.register("master_contexts", M_ArtistContextViewSet, basename='master_artist_context')
+router.register("master_artist_tags", M_ArtistTagViewSet, basename='master_artist_tags')
+router.register("master_artist_contexts", M_ArtistContextViewSet, basename='master_artist_contexts')
 
 urlpatterns = [
     # ViewSet関連のURL(CRUD一括)

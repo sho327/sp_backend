@@ -2,13 +2,14 @@ from datetime import datetime
 from django.utils import timezone
 from django.core.paginator import Paginator
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError as DRF_ValidationError
 
 # --- コアモジュール ---
 from core.decorators.logging_process_with_sql import logging_process_with_sql
 from core.consts import LOG_METHOD
 from core.utils.log_helpers import log_output_by_msg_id
 from core.utils.date_format import convert_to_site_timezone
-from core.exceptions.exceptions import ApplicationError
+from core.exceptions.exceptions import ApplicationError, ValidationError
 from core.views import BaseAPIView
 
 # --- アーティストモジュール ---
@@ -44,8 +45,13 @@ class ArtistListView(BaseAPIView):
         try:
             return self.artist_list(request, *args, **kwargs)
         except ApplicationError:
+            # ApplicationError関連はカスタムエラー処理が設定されている為そのまま親へスローする
             raise
+        except DRF_ValidationError as e:
+            # DRFバリデーションエラーは専用エラーに差し替える
+            raise ValidationError() from e
         except Exception as e:
+            # その他想定外エラーの場合もAPIエラーとする
             raise ApplicationError() from e
     
     def artist_list(self, request, *args, **kwargs):
@@ -68,7 +74,7 @@ class ArtistListView(BaseAPIView):
         serializer.is_valid(raise_exception=True)
         # リクエストデータ変数化
         name = serializer.validated_data.get("name")
-        tag_ids = serializer.validated_data("tag_ids")
+        tag_ids = serializer.validated_data.get("tag_ids")
         per_page = serializer.validated_data.get("per_page")
         page = serializer.validated_data.get("page")
         refresh = serializer.validated_data.get('refresh')
@@ -115,5 +121,4 @@ class ArtistListView(BaseAPIView):
             logger_name=LOG_METHOD.APPLICATION.value
         )
         
-        # 8. レスポンス返却
         return response

@@ -49,11 +49,14 @@ class LoggingMiddleware:
         status_code = response.status_code
         t1 = time.time()
 
+        # 秒数(t1-t0)に1000を掛けてミリ秒にします
+        elapsed_ms = (t1 - t0) * 1000
+
         # メッセージ内容の設定
         message = (
             f"{client_ip} {client_host} {http_host} -> {server_name} {server_port} "
             f"{request_method} {path} {status_code} {content_type} "
-            f"size: {content_length} time: {t1 - t0:.4f}"  # 処理時間を小数点以下4桁でフォーマット
+            f"size: {content_length} time: {elapsed_ms:.1f}ms"
         )
 
         # ステータスコードの判定（200番台はINFO、それ以外はWARNING）

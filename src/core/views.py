@@ -19,7 +19,7 @@ class BaseAPIView(APIView):
         """
         response_body = self._get_common_meta()
         response_body.update({
-            "count": count if count is not None else len(data),
+            "totalCount": count if count is not None else len(data),
             "results": data  # 必ず 'results' というキーに入れる
         })
         if extra_meta:
@@ -68,7 +68,7 @@ class CommonResponseMixin:
             # List系
             response.data = {
                 **self.get_common_meta(),
-                "count": len(response.data),
+                "totalCount": len(response.data),
                 "results": response.data
             }
         elif isinstance(response.data, dict):

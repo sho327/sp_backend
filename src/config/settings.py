@@ -13,6 +13,9 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 import os, platform
 from datetime import timedelta
 from pathlib import Path
+from django.templatetags.static import static
+from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
 
 import environ
 
@@ -88,6 +91,17 @@ TOKEN_EXPIRY_SECONDS = {
 # 3. アプリケーション定義
 # ==============================================================================
 INSTALLED_APPS = [
+    # ----- 外部パッケージ(django.contrib.adminより上に書く条件あり) -----
+    "unfold",  # before django.contrib.admin
+    "unfold.contrib.filters",  # optional, if special filters are needed
+    "unfold.contrib.forms",  # optional, if special form elements are needed
+    "unfold.contrib.inlines",  # optional, if special inlines are needed
+    "unfold.contrib.import_export",  # optional, if django-import-export package is used
+    "unfold.contrib.guardian",  # optional, if django-guardian package is used
+    "unfold.contrib.simple_history",  # optional, if django-simple-history package is used
+    "unfold.contrib.location_field",  # optional, if django-location-field package is used
+    "unfold.contrib.constance",  # optional, if django-constance package is used
+    "simple_history",
     # ----- Django 標準 Apps -----
     "django.contrib.admin",
     "django.contrib.auth",
@@ -102,7 +116,7 @@ INSTALLED_APPS = [
     "corsheaders",
     # ----- プロジェクト固有 Apps -----
     # 1. 基盤/管理系
-    # "core",
+    "core",
     "apps.account",       # アカウント認証・プロフィール機能
     "apps.common",        # 共通機能
     "apps.artist",        # アーティスト機能
@@ -140,7 +154,8 @@ SITE_ID = 1
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],  # 特殊な共通テンプレートがなければ空でOK
+        # "DIRS": [],  # 特殊な共通テンプレートがなければ空でOK(今回はunfoldを使用するので不要)
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -154,6 +169,114 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "config.wsgi.application"
+
+UNFOLD = {
+    "SITE_TITLE": "SpotifyMixer/Admin",
+    "SITE_HEADER": "SpotifyMixer",
+    "SITE_SUBHEADER": "管理者用",
+    # "SITE_DROPDOWN": [
+    #     {
+    #         "icon": "diamond",
+    #         "title": _("外部: SpotifyMixer(一般用)"),
+    #         "link": "https://example.com",
+    #         "link": "/admin/",
+    #     },
+    # ],
+    "SITE_URL": "/",
+    "SHOW_HISTORY": True, # show/hide "History" button, default: True
+    "SHOW_VIEW_ON_SITE": False, # show/hide "View on site" button, default: True
+    "SHOW_BACK_BUTTON": False, # show/hide "Back" button on changeform in header, default: False
+    "DASHBOARD_CALLBACK": "config.admin_dashboard.dashboard_callback",
+    # "THEME": "dark",
+    "BORDER_RADIUS": "6px",
+    "COLORS": {
+        "primary": {
+            "50": "240 253 244",
+            "100": "220 252 231",
+            "200": "187 247 208",
+            "300": "134 239 172",
+            "400": "74 222 128",
+            "500": "29 185 84",
+            "600": "22 163 74",
+            "700": "21 128 61",
+            "800": "22 101 52",
+            "900": "20 83 45",
+        },
+    },
+    "EXTENSIONS": {
+        "modeltranslation": {
+            "flags": {
+                "en": "🇬🇧",
+                "fr": "🇫🇷",
+                "nl": "🇧🇪",
+            },
+        },
+    },
+    "SIDEBAR": {
+        "show_search": False,  # Search in applications and models names
+        "command_search": False,  # Replace the sidebar search with the command search
+        # "show_all_applications": True,  # Dropdown with all applications and models
+        "navigation": [
+            {
+                "title": _("ホーム"),
+                "separator": False,  # Top border
+                "collapsible": False,  # Collapsible group of links
+                "items": [
+                    {
+                        "title": _("ダッシュボード"),
+                        "icon": "dashboard",  # Supported icon set: https://fonts.google.com/icons
+                        "link": reverse_lazy("admin:index"),
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                ],
+            },
+            {
+                "title": _("アカウント"),
+                "separator": True,  # Top border
+                "collapsible": False,  # Collapsible group of links
+                "items": [
+                    {
+                        "title": _("ユーザマスタ"),
+                        "icon": "people",  # Supported icon set: https://fonts.google.com/icons
+                        "link": "/admin/account/m_user/",
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                    {
+                        "title": _("プロフィールトラン"),
+                        "icon": "account_circle",  # Supported icon set: https://fonts.google.com/icons
+                        "link": "/admin/account/t_profile/",
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                    {
+                        "title": _("ログイン履歴トラン"),
+                        "icon": "history",  # Supported icon set: https://fonts.google.com/icons
+                        "link": "/admin/account/t_loginhistory/",
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                ],
+            },
+            {
+                "title": _("アーティスト"),
+                "separator": True,  # Top border
+                "collapsible": False,  # Collapsible group of links
+                "items": [
+                    {
+                        "title": _("アーティストコンテキストマスタ"),
+                        "icon": "topic",  # Supported icon set: https://fonts.google.com/icons
+                        "link": "/admin/artist/m_artistcontext/",
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                    {
+                        "title": _("アーティストタグマスタ"),
+                        "icon": "more",  # Supported icon set: https://fonts.google.com/icons
+                        "link": "/admin/artist/m_artisttag/",
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                ],
+            },
+        ],
+    },
+}
 
 # ==============================================================================
 # 5. データベース定義、データベース認証方式
@@ -213,7 +336,13 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # メール設定
 EMAIL_BACKEND = env("EMAIL_BACKEND")
 EMAIL_FROM = env("EMAIL_FROM")
-# 外部ストレージ
+
+# メディア関連設定
+# MEDIA_ROOT: 物理的なパス(サーバーのHDD内)
+# => Djangoがファイルをどこに保存し、どこから読み込むか(例: /home/user/project/media/)
+# MEDIA_URL: URLのパス (ブラウザのURLバー)
+# => ブラウザから見たとき、ファイルにアクセスするためのURL開始地点(例: /media/)
+MEDIA_ROOT = BASE_DIR / "media"
 MEDIA_URL = '/media/'
 # Spotify/API
 SPOTIFY_CLIENT_ID = env("SPOTIFY_CLIENT_ID")

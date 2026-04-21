@@ -12,6 +12,8 @@ dependencies = [
     "djangorestframework-simplejwt",
     "spotipy",
     "pillow>=12.2.0",
+    # "django-jazzmin", # adminlteっぽくてダサい...
+    "django-unfold",
 ]
 
 # isort本体(ライブラリ)とRuffの両方の設定を書いているのは、エディタのプラグイン対策

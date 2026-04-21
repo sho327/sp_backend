@@ -8,7 +8,8 @@ from core.models import BaseModel
 
 # アーティストタグリレーション
 class R_ArtistTag(BaseModel):
-    """ アーティストトラン/アーティストタグマスタの紐づけ """
+    """アーティストトラン/アーティストタグマスタの紐づけ"""
+
     # ---------- Consts ----------
     # ---------- Fields ----------
     # ID (BIGINT PRIMARY KEY) はDjangoが自動で付与
@@ -53,4 +54,3 @@ class R_ArtistTag(BaseModel):
 
     def __str__(self):
         return f"{self.artist} - {self.tag}"
-

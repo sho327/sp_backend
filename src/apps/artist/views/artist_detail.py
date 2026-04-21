@@ -1,13 +1,14 @@
 from datetime import datetime
 from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError as DRF_ValidationError
 
 # --- コアモジュール ---
 from core.decorators.logging_process_with_sql import logging_process_with_sql
 from core.consts import LOG_METHOD
 from core.utils.log_helpers import log_output_by_msg_id
 from core.utils.date_format import convert_to_site_timezone
-from core.exceptions.exceptions import ApplicationError
+from core.exceptions.exceptions import ApplicationError, ValidationError
 from core.views import BaseAPIView
 
 # --- アーティストモジュール ---
@@ -43,8 +44,13 @@ class ArtistDetailView(BaseAPIView):
         try:
             return self.artist_detail(request, artist_id, *args, **kwargs)
         except ApplicationError:
+            # ApplicationError関連はカスタムエラー処理が設定されている為そのまま親へスローする
             raise
+        except DRF_ValidationError as e:
+            # DRFバリデーションエラーは専用エラーに差し替える
+            raise ValidationError() from e
         except Exception as e:
+            # その他想定外エラーの場合もAPIエラーとする
             raise ApplicationError() from e
     
     def artist_detail(self, request, artist_id, *args, **kwargs):
@@ -101,5 +107,4 @@ class ArtistDetailView(BaseAPIView):
             logger_name=LOG_METHOD.APPLICATION.value
         )
 
-        # 7. レスポンス返却
         return response

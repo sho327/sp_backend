@@ -18,7 +18,7 @@ class FileResourceMiniResponseSerializer(FileResourceBaseSerializer):
 
     class Meta(FileResourceBaseSerializer.Meta):
         # 外部URLか内部ファイルかを隠蔽して'url'だけを返す
-        fields = ['id', 'url']
+        fields = ['id', 'file_name', 'url']
 
 class FileResourceFullResponseSerializer(FileResourceBaseSerializer):
     """

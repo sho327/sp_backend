@@ -22,5 +22,8 @@ urlpatterns = [
     path(f"{BASE_API_PATH}/playlists/", include(playlist_router.urls)),
     path(f"{BASE_API_PATH}/playlists/", include("apps.playlist.urls")),
 
-# 静的ファイル配信
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]
+
+# 開発環境のみ、メディアファイルを配信する設定を追加
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

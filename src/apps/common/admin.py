@@ -1,74 +1,56 @@
 # from django.contrib import admin
+# from django.utils.translation import gettext_lazy as _
 # from django.utils.html import format_html
+# from unfold.admin import ModelAdmin
+# from apps.common.models import T_FileResource
 
-# #  共通モジュール ---
-# from apps.common.models import T_SpotifyUserToken, T_FileResource
+# # 共通Mixin
+# class SaveAdminMixin:
+#     def save_model(self, request, obj, form, change):
+#         if not change:
+#             obj.created_by = request.user
+#             obj.created_method = "admin_panel"
+#         obj.updated_by = request.user
+#         obj.updated_method = "admin_panel"
+#         super().save_model(request, obj, form, change)
+    
+    # # SHOW_VIEW_ON_SITEがTrueの場合だけ設定される
+    #     def view_on_site(self, obj):
+    #         return "http://localhost:3000/dashboard"
 
-# # ------------------------------------------------------------------
-# # T_SpotifyUserToken(Spotify認証トークン管理)
-# # ------------------------------------------------------------------
-# @admin.register(T_SpotifyUserToken)
-# class T_SpotifyUserTokenAdmin(admin.ModelAdmin):
-#     """
-#     SpotifyAPI接続用のトークン管理
-#     """
-#     list_display = ("id", "display_access_token", "expired_at", "display_status", "updated_at")
-#     readonly_fields = ("id", "created_at", "updated_at")
-
-#     fieldsets = (
-#         ("トークン情報", {
-#             "fields": ("id", "access_token", "refresh_token", "expired_at")
-#         }),
-#         ("リフレッシュ制御", {
-#             "fields": ("refreshing", "refreshing_until")
-#         }),
-#         ("システム情報", {
-#             "fields": ("created_method", "updated_method", "created_at", "updated_at", "deleted_at")
-#         }),
-#     )
-
-#     def display_access_token(self, obj):
-#         """トークンの冒頭のみを表示"""
-#         return f"{obj.access_token[:20]}..."
-#     display_access_token.short_description = "アクセストークン"
-
-#     def display_status(self, obj):
-#         """有効期限やロック状態をラベル表示"""
-#         if obj.is_refreshing():
-#             return format_html('<span style="color: #ff9800; font-weight: bold;">🔄 リフレッシュ中</span>')
-#         if obj.is_expired():
-#             return format_html('<span style="color: #f44336; font-weight: bold;">⚠️ 期限切れ</span>')
-#         return format_html('<span style="color: #4caf50; font-weight: bold;">✅ 有効</span>')
-#     display_status.short_description = "ステータス"
+# class SoftDeleteFilter(admin.SimpleListFilter):
+#     title = _('状態')
+#     parameter_name = 'is_deleted'
+#     def lookups(self, request, model_admin):
+#         return (('active', _('有効のみ')), ('deleted', _('削除済みのみ')),)
+#     def queryset(self, request, queryset):
+#         if self.value() == 'active': return queryset.filter(deleted_at__isnull=True)
+#         if self.value() == 'deleted': return queryset.filter(deleted_at__isnull=False)
+#         return queryset
 
 # # ------------------------------------------------------------------
-# # T_FileResource (ファイルリソース管理)
+# # T_FileResource
 # # ------------------------------------------------------------------
 # @admin.register(T_FileResource)
-# class T_FileResourceAdmin(admin.ModelAdmin):
-#     """
-#     画像・外部URL等のファイルリソース管理
-#     """
-#     list_display = ("file_name", "file_type", "display_preview", "file_size_kb", "created_at")
-#     list_filter = ("file_type", "deleted_at")
+# class T_FileResourceAdmin(SaveAdminMixin, ModelAdmin):
+#     list_display = ("file_name", "file_type", "display_preview", "file_size_kb", "created_at", "deleted_at")
+#     list_filter = (SoftDeleteFilter, "file_type", "deleted_at")
 #     search_fields = ("file_name", "external_url")
 #     readonly_fields = ("id", "created_at", "updated_at")
 
 #     fieldsets = (
-#         ("基本情報", {
-#             "fields": ("id", "file_name", "file_type")
-#         }),
-#         ("リソース実体", {
-#             "fields": ("file_data", "external_url", "file_size")
-#         }),
+#         ("基本情報", {"fields": ("id", "file_name", "file_type")}),
+#         ("リソース実体", {"fields": ("file_data", "external_url", "file_size")}),
 #         ("システム情報", {
-#             "fields": ("created_method", "updated_method", "created_at", "updated_at", "deleted_at")
+#             "fields": ("created_method", "updated_method", "created_at", "updated_at", "deleted_at"),
+#             "classes": ("collapse",)
 #         }),
 #     )
 
 #     def display_preview(self, obj):
 #         """管理画面上で画像のプレビューを表示"""
-#         if obj.url:
+#         # ※ モデル側に url プロパティがある前提です
+#         if hasattr(obj, 'url') and obj.url:
 #             return format_html('<img src="{}" style="width: 50px; height: auto; border-radius: 4px;" />', obj.url)
 #         return "-"
 #     display_preview.short_description = "プレビュー"

@@ -54,11 +54,11 @@ def logging_process_with_sql(func: Callable) -> Callable:
                 log_params = str(raw_data)
 
         # 3. 処理開始ログ（ここだけ残す）
-        log_output_by_msg_id(
-            log_id="MSGI001",
-            params=[f"[PROCESS START] {class_name}.{func.__name__} | Input: {json.dumps(log_params, ensure_ascii=False)}"],
-            logger_name=LOG_METHOD.APPLICATION.value,
-        )
+        # log_output_by_msg_id(
+        #     log_id="MSGI001",
+        #     params=[f"[PROCESS START] {class_name}.{func.__name__} | Input: {json.dumps(log_params, ensure_ascii=False)}"],
+        #     logger_name=LOG_METHOD.APPLICATION.value,
+        # )
 
         query_logger = QueryLogger()
 

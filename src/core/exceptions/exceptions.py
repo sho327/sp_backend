@@ -12,7 +12,6 @@ class ApplicationError(APIException):
     # --------------------------------------------------
     # 共通属性 (子クラスで上書きされることを想定)
     # --------------------------------------------------
-
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     message_id = "ERR_UNKNOWN"
     message = "Internal Server Error"

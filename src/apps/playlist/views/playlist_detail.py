@@ -1,13 +1,14 @@
 from datetime import datetime
 from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError as DRF_ValidationError
 
 # --- コアモジュール ---
 from core.decorators.logging_process_with_sql import logging_process_with_sql
 from core.consts import LOG_METHOD
 from core.utils.log_helpers import log_output_by_msg_id
 from core.utils.date_format import convert_to_site_timezone
-from core.exceptions.exceptions import ApplicationError
+from core.exceptions.exceptions import ApplicationError, ValidationError
 from core.views import BaseAPIView
 
 # --- プレイリストモジュール ---
@@ -27,7 +28,7 @@ class PlaylistDetailView(BaseAPIView):
     playlist_service = PlaylistService()
 
     @logging_process_with_sql
-    def get(self, request, playlist_id, *args, **kwargs):
+    def get(self, request, playlist_id: str, *args, **kwargs):
         """
         GETリクエストを受け付ける。
         Method: GET
@@ -43,13 +44,18 @@ class PlaylistDetailView(BaseAPIView):
         try:
             return self.playlist_detail(request, playlist_id, *args, **kwargs)
         except ApplicationError:
+            # ApplicationError関連はカスタムエラー処理が設定されている為そのまま親へスローする
             raise
+        except DRF_ValidationError as e:
+            # DRFバリデーションエラーは専用エラーに差し替える
+            raise ValidationError() from e
         except Exception as e:
+            # その他想定外エラーの場合もAPIエラーとする
             raise ApplicationError() from e
     
-    def playlist_detail(self, request, playlist_id, *args, **kwargs):
+    def playlist_detail(self, request, playlist_id: str, *args, **kwargs):
         """
-        プレイリスト登録処理
+        プレイリスト詳細取得処理
         Args:
             request:  HTTPリクエスト
         """
@@ -57,7 +63,7 @@ class PlaylistDetailView(BaseAPIView):
         # 1. 処理開始ログ出力(GETなのでクエリパラメータを出力)
         log_output_by_msg_id(
             log_id="MSGI003", 
-            params=[KINO_ID, f"ID: {playlist_id}, Params: {request.query_params}"], 
+            params=[KINO_ID, f"playlist_id: {playlist_id}, query_params: {request.query_params}"], 
             logger_name=LOG_METHOD.APPLICATION.value
         )
 
@@ -97,9 +103,8 @@ class PlaylistDetailView(BaseAPIView):
         # 6. 処理終了ログ出力
         log_output_by_msg_id(
             log_id="MSGI004", 
-            params=[KINO_ID, f"ID: {playlist_id}, Refreshed: {refresh}"], 
+            params=[KINO_ID, f"playlist_id: {playlist_id}, Refreshed: {refresh}"], 
             logger_name=LOG_METHOD.APPLICATION.value
         )
 
-        # 7. レスポンス返却
         return response

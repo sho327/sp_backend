@@ -10,7 +10,7 @@ from core.models import BaseModel
 # ユーザ発行トークントラン
 class T_UserToken(BaseModel):
     # ---------- Consts ----------
-    class TokenTypes(models.TextChoices):
+    class TokenType(models.TextChoices):
         ACTIVATION = "AC", "アカウント有効化"
         PASSWORD_RESET = "PR", "パスワードリセット"
         EMAIL_CHANGE = "EC", "メールアドレス変更確認"
@@ -32,7 +32,7 @@ class T_UserToken(BaseModel):
         verbose_name="トークン種別",
         db_comment="トークン種別",
         max_length=2,
-        choices=TokenTypes.choices,
+        choices=TokenType.choices,
     )
     # トークンハッシュ（SHA256など）
     token_hash = models.CharField(
@@ -73,7 +73,7 @@ class T_UserToken(BaseModel):
 # ログイン履歴
 class T_LoginHistory(BaseModel):
     # ---------- Consts ----------
-    class FailureReasons(models.TextChoices):
+    class FailureReason(models.TextChoices):
         PASSWORD_MISMATCH = "PASSWORD_MISMATCH", "パスワード不一致"
         LOCKED = "LOCKED", "アカウントロック中"
         NOT_ACTIVATED = "NOT_ACTIVATED", "アカウント未有効化"
@@ -115,7 +115,7 @@ class T_LoginHistory(BaseModel):
         blank=True,
         verbose_name="ログイン失敗理由コード",
         db_comment="ログイン失敗理由コード",
-        choices=FailureReasons.choices,
+        choices=FailureReason.choices,
     )
     # IPアドレス
     ip_address = models.CharField(
@@ -160,7 +160,7 @@ class T_Profile(BaseModel):
     # ---------- Consts ----------
     # アカウントステータスコード(アカウントの論理的なライフサイクル(最終的な利用可否))
     # 一時的な認証プロセスではなく、ユーザーの永続的な状態(退会、凍結、ロック)を示す
-    class AccountStatues(models.IntegerChoices):
+    class AccountStatus(models.IntegerChoices):
         ACTIVE = 10, "アクティブ"
         TEMPORARY_LOCKED = 30, "一時ロック"
         FROZEN = 40, "永続凍結"
@@ -233,9 +233,9 @@ class T_Profile(BaseModel):
         db_column="status_code",
         verbose_name="ステータスコード",
         db_comment="ステータスコード",
-        choices=AccountStatues.choices,
-        db_default=AccountStatues.ACTIVE,
-        default=AccountStatues.ACTIVE,
+        choices=AccountStatus.choices,
+        db_default=AccountStatus.ACTIVE,
+        default=AccountStatus.ACTIVE,
         db_index=True,
     )
     # ロック解除日時

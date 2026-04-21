@@ -13,17 +13,20 @@ class ArtistSearchRequestSerializer(serializers.Serializer):
     limit = serializers.IntegerField(
         required=False, 
         min_value=1, 
-        max_value=50, 
-        default=20
+        max_value=10,
+        default=10
     )
+    include_mbid = serializers.BooleanField(required=False)
 
 class ArtistSearchResponseSerializer(serializers.Serializer):
     """
     出力：フロントエンドへ返すデータの定義
     """
-    spotify_id = serializers.CharField()
+    deezer_id = serializers.CharField()
     name = serializers.CharField()
     image_url = serializers.URLField(allow_null=True)
-    genres = serializers.ListField(child=serializers.CharField())
-    popularity = serializers.IntegerField()
+    # genres = serializers.ListField(child=serializers.CharField())
+    # popularity = serializers.IntegerField()
     is_registered = serializers.BooleanField(default=False)
+    mbid = serializers.CharField()
+    setlistfm_mbid = serializers.CharField()
