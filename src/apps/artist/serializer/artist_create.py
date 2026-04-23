@@ -1,20 +1,18 @@
 from rest_framework import serializers
 
 # --- アーティストモジュール ---
-from apps.artist.models import M_ArtistTag, M_ArtistContext
+from apps.artist.models import M_ArtistContext, M_ArtistTag
+
 
 class ArtistCreateRequestSerializer(serializers.Serializer):
     """
     入力：フロントエンドから送られてくるデータの検品
     """
-    deezer_id = serializers.CharField(required=True)
-    name = serializers.CharField(required=True)
-    image_url = serializers.URLField(required=False, allow_null=True)
-    
-    # required=Falseではあるが検索で返す予定なので基本的に設定したい
-    # ※検索が重くなりすぎれば、自動登録を使う
-    setlistfm_mbid = serializers.CharField(required=False, allow_null=True)
-    is_mbid_autoset = serializers.BooleanField(required=False)
+
+    spotify_id = serializers.CharField(required=True)
+    spotify_name = serializers.CharField(required=True)
+    display_name = serializers.CharField(required=False, allow_null=True)
+    icon_url = serializers.URLField(required=False, allow_null=True)
 
     # ※PrimaryKeyRelatedFieldを利用
     # serializers.PrimaryKeyRelatedFieldのqueryset にフィルタをかけている場合、
@@ -31,8 +29,3 @@ class ArtistCreateRequestSerializer(serializers.Serializer):
         many=True,
         required=False,
     )
-    # genres = serializers.ListField(
-    #     child=serializers.CharField(),
-    #     required=False,
-    #     default=[]
-    # )

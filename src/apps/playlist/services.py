@@ -480,52 +480,6 @@ class PlaylistService:
 
         return track
 
-    # プレイリストトラック削除
-    def remove_playlist_track(
-        self,
-        date_now: datetime,
-        kino_id: str,
-        user: M_User,
-        playlist_id: str,
-        track_id: str,
-    ):
-        """プレイリスト内のトラックを削除する"""
-        # 1. プレイリストの存在チェック
-        if not T_Playlist.objects.filter(
-            id=playlist_id, user=user, deleted_at__isnull=True
-        ).exists():
-            raise PlaylistNotFoundError()
-
-        # 2. 対象の取得(プレイリストトラック/存在チェック)
-        track = None
-        try:
-            track: T_PlaylistTrack = T_PlaylistTrack.objects.select_for_update().get(
-                id=track_id,
-                playlist_id=playlist_id,
-                deleted_at__isnull=True,
-            )
-        except T_PlaylistTrack.DoesNotExist:
-            raise PlaylistTrackNotFoundError()
-
-        # 3. 紐づくファイルリソース(画像)の削除
-        # スナップショット的に作成したものなので、トラック消滅と共に不要となる
-        if track.artist_spotify_image:
-            # ストレージ上の実ファイルがある場合はそれも消す
-            if track.artist_spotify_image.storage_path:
-                self.storage_service.delete_file(
-                    track.artist_spotify_image.storage_path
-                )
-
-            # FileResourceレコード自体の削除(物理削除でOKな場合)
-            track.artist_spotify_image.delete()
-
-        # 4. 論理削除処理
-        # deleted_at を入れることで、以降のfilter(deleted_at__isnull=True)から除外される
-        track.updated_by = user
-        track.updated_method = kino_id
-        track.deleted_at = date_now
-        track.save()
-
     # ------------------------------------------------------------------
     # その他サービス
     # ------------------------------------------------------------------

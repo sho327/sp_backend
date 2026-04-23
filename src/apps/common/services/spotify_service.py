@@ -1,27 +1,26 @@
-import spotipy
-from spotipy.exceptions import SpotifyException
-from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
-from django.conf import settings
-from django.utils import timezone
 from datetime import timedelta
 from typing import List
 from urllib.parse import quote
 
-# --- コアモジュール ---
-from core.consts import LOG_METHOD
-from core.utils.log_helpers import log_output_by_msg_id
-from core.exceptions.exceptions import (
-    ExternalServiceError,
-    ResourceNotFoundError,
-)
+import spotipy
+from django.conf import settings
+from django.utils import timezone
+from spotipy.exceptions import SpotifyException
+from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
 
 # --- 共通モジュール ---
 # from apps.common.models import T_SpotifyUserToken
 from apps.common.exceptions import (
-    SpotifyTokenNotFoundException,
+    SpotifyApiLimitException,
     SpotifyAuthFailedException,
-    SpotifyApiLimitException
+    SpotifyTokenNotFoundException,
 )
+
+# --- コアモジュール ---
+from core.consts import LOG_METHOD
+from core.exceptions.exceptions import ExternalServiceError, ResourceNotFoundError
+from core.utils.log_helpers import log_output_by_msg_id
+
 
 class SpotifyService:
     """
@@ -59,14 +58,13 @@ class SpotifyService:
                 logger_name=LOG_METHOD.APPLICATION.value,
             )
             raise ExternalServiceError() from e
-            
 
     def _get_client(self):
         """認証モードに応じてSpotipyクライアントを初期化"""
         # システム認証モード
         auth_manager = SpotifyClientCredentials(
             client_id=settings.SPOTIFY_CLIENT_ID,
-            client_secret=settings.SPOTIFY_CLIENT_SECRET
+            client_secret=settings.SPOTIFY_CLIENT_SECRET,
         )
         return spotipy.Spotify(auth_manager=auth_manager)
 
@@ -109,7 +107,7 @@ class SpotifyService:
     #             # ロックが解けるまで待機するか、エラーを投げる
     #             # 今回は簡易的にそのまま現在のトークンを返すが、本来は待機ロジックを推奨
     #             return token_obj.access_token
-            
+
     #         # リフレッシュ中で無ければトークンリフレッシュを行う
     #         try:
     #             self._refresh_user_token(token_obj)
@@ -148,21 +146,21 @@ class SpotifyService:
     #             client_secret=settings.SPOTIFY_CLIENT_SECRET,
     #             redirect_uri=settings.SPOTIFY_REDIRECT_URI
     #         )
-            
+
     #         # リフレッシュ実行 (内部で Basic 認証 + refresh_token 送信)
     #         # data = {"grant_type": "refresh_token", "refresh_token": ...}
     #         new_token_info = oauth.refresh_access_token(token_obj.refresh_token)
-            
+
     #         # 2. データの更新
     #         token_obj.access_token = new_token_info['access_token']
-            
+
     #         # 新しい refresh_token が発行された場合のみ上書き(ご提示のロジック通り)
     #         if 'refresh_token' in new_token_info:
     #             token_obj.refresh_token = new_token_info['refresh_token']
-            
+
     #         # 有効期限の更新(expires_in秒後)
     #         token_obj.expired_at = timezone.now() + timedelta(seconds=new_token_info['expires_in'])
-            
+
     #         # ロックの解除
     #         token_obj.refreshing = False
     #         token_obj.refreshing_until = None
@@ -176,7 +174,7 @@ class SpotifyService:
     #         # ここでは raise e する。特定のエラー判定は呼び出し側で行う。
     #         raise e
     # 2026/04/19 Spotifyは人気曲の取得API/レコメンド取得APIが使用不可のため、DeezerAPIを使用した形で実現させる
-    
+
     def _call_api(self, func, *args, **kwargs):
         """
         Spotify API実行用の共通ラッパー。
@@ -186,7 +184,9 @@ class SpotifyService:
             # デバッグログ出力
             log_output_by_msg_id(
                 log_id="MSGD001",
-                params=[f"SpotifyAPI/DEBUG: Calling {func.__name__} with args={args}, kwargs={kwargs}"],
+                params=[
+                    f"SpotifyAPI/DEBUG: Calling {func.__name__} with args={args}, kwargs={kwargs}"
+                ],
                 logger_name=LOG_METHOD.APPLICATION.value,
             )
             return func(*args, **kwargs)
@@ -216,7 +216,7 @@ class SpotifyService:
                     logger_name=LOG_METHOD.APPLICATION.value,
                 )
                 raise ResourceNotFoundError() from e
-            
+
             # それ以外の500系などは共通外部エラー
             log_output_by_msg_id(
                 log_id="MSGE001",
@@ -236,29 +236,26 @@ class SpotifyService:
     # ------------------------------------------------------------------
     # アーティスト関連/API実行メソッド(ラッパー経由で呼び出す)
     # ------------------------------------------------------------------
-    # 2026/04/19 Spotifyは人気曲の取得API/レコメンド取得APIが使用不可のため、DeezerAPIを使用した形で実現させる
-    # ※「"Spotifyプレイリスト作成"」ツールになるのでトラック情報の検索、取得に関してはそのまま使用する
     # アーティスト情報取得(1件取得)
-    # def fetch_get_artist(self, spotify_id):
-    #     return self._call_api(self.sp.artist, spotify_id)
+    def fetch_get_artist(self, spotify_id):
+        return self._call_api(self.sp.artist, spotify_id)
 
     # アーティスト情報取得(一括取得)
-    # def fetch_get_artists(self, spotify_ids: list):
-    #     if not spotify_ids:
-    #         return []
-    #     # spotipyのartists()は辞書を返すので、中身を取り出す
-    #     results = self._call_api(self.sp.artists, spotify_ids)
-    #     return results.get('artists', [])
-    
+    def fetch_get_artists(self, spotify_ids: list):
+        if not spotify_ids:
+            return []
+        # spotipyのartists()は辞書を返すので、中身を取り出す
+        results = self._call_api(self.sp.artists, spotify_ids)
+        return results.get('artists', [])
+
     # アーティスト検索
-    # def fetch_search_artists(self, query, limit=10):
-    #     """キーワードによるアーティスト検索"""
-    #     results = self._call_api(self.sp.search, q=query, limit=limit, type='artist')
-    #     if results and 'artists' in results:
-    #         return results['artists'].get('items', [])
-        # return []
-    # 2026/04/19 Spotifyは人気曲の取得API/レコメンド取得APIが使用不可のため、DeezerAPIを使用した形で実現させる
-    
+    def fetch_search_artists(self, query, limit=10):
+        """キーワードによるアーティスト検索"""
+        results = self._call_api(self.sp.search, q=query, limit=limit, type="artist")
+        if results and "artists" in results:
+            return results["artists"].get("items", [])
+        return []
+
     # ------------------------------------------------------------------
     # トラック関連/API実行メソッド(ラッパー経由で呼び出す)
     # ------------------------------------------------------------------
@@ -273,16 +270,16 @@ class SpotifyService:
         if not spotify_ids:
             return []
         results = self._call_api(self.sp.tracks, spotify_ids)
-        return results.get('tracks', [])
+        return results.get("tracks", [])
 
     # トラック検索
     def fetch_search_tracks(self, query, limit=1):
         """キーワードによるトラック検索"""
-        results = self._call_api(self.sp.search, q=query, limit=limit, type='track')
-        if results and 'tracks' in results:
-            return results['tracks'].get('items', [])
+        results = self._call_api(self.sp.search, q=query, limit=limit, type="track")
+        if results and "tracks" in results:
+            return results["tracks"].get("items", [])
         return []
-    
+
     # 2026/04/19 Spotifyは人気曲の取得API/レコメンド取得APIが使用不可のため、DeezerAPIを使用した形で実現させる
     # 特定のアーティストに紐づく人気曲データ取得
     # def fetch_get_artist_top_tracks(self, spotify_id, limit=5):
@@ -313,7 +310,7 @@ class SpotifyService:
     #     )
     #     return results.get("tracks", [])
     # 2026/04/19 Spotifyは人気曲の取得API/レコメンド取得APIが使用不可のため、DeezerAPIを使用した形で実現させる
-    
+
     # ------------------------------------------------------------------
     # その他メソッド
     # ------------------------------------------------------------------

@@ -33,57 +33,39 @@ class T_Artist(BaseModel):
         # 逆参照名を定義(例: 「参照先インスタンス.[related_name]」/通常参照は「本インスタンス.参照先モデル名(_id)」で取得可能)
         related_name="user_t_artist_set",  # 役割_[複数形]ルール
     )
-    # Deezer/ID
-    deezer_id = models.CharField(
-        db_column="deezer_id",
-        verbose_name="Deezer/ID",
-        db_comment="Deezer/ID",
+    # Spotify/ID
+    spotify_id = models.CharField(
+        db_column="spotify_id",
+        verbose_name="Spotify/ID",
+        db_comment="Spotify/ID",
         max_length=255,
     )
-    # アーティスト名
-    name = models.CharField(
-        db_column="name",
-        verbose_name="アーティスト名",
-        db_comment="アーティスト名",
+    # Spotify/アーティスト名
+    spotify_name = models.CharField(
+        db_column="spotify_name",
+        verbose_name="Spotify/アーティスト名",
+        db_comment="Spotify/アーティスト名",
         max_length=255,
     )
-    # アーティスト名/LastFM
-    lastfm_name = models.CharField(
-        db_column="lastfm_name",
-        verbose_name="アーティスト名/LastFM",
-        db_comment="アーティスト名/LastFM",
+    # アーティスト表示名
+    display_name = models.CharField(
+        db_column="display_name",
+        verbose_name="アーティスト表示名",
+        db_comment="アーティスト表示名",
         max_length=255,
         null=True,
         blank=True,
     )
-    # Deezer画像(削除/物理削除の場合はCASCADE)
-    deezer_image = models.ForeignKey(
+    # 外部アイコン(削除/物理削除の場合はCASCADE)
+    external_icon = models.ForeignKey(
         "common.T_FileResource",
-        db_column="deezer_image_id",
-        verbose_name="Deezer画像",
-        db_comment="Deezer画像",
+        db_column="external_icon_id",
+        verbose_name="外部アイコン",
+        db_comment="外部アイコン",
         on_delete=models.CASCADE,
-        related_name="deezer_image_t_artist_set",
+        related_name="external_icon_t_artist_set",
         null=True,
         blank=True,
-    )
-    # SetlistFm/MBID
-    # 手動で設定された場合はこちらを優先。空の場合はname_enで自動検索する。
-    setlistfm_mbid = models.CharField(
-        db_column="setlistfm_mbid",
-        verbose_name="SetlistFm/MBID",
-        db_comment="setlistfm_mbid",
-        max_length=100,
-        null=True,
-        blank=True,
-    )
-    # MBID/自動紐付けフラグ
-    # 手動での紐づけの場合False、自動設定でMBIDを設定した場合はTrue
-    is_mbid_autoset = models.BooleanField(
-        db_column="is_mbid_autoset",
-        verbose_name="MBID/自動紐付けフラグ",
-        db_comment="MBID/自動紐付けフラグ",
-        default=False,
     )
     # コンテキスト/きっかけ(削除/物理削除の場合はSET_NULL)
     context = models.ForeignKey(
@@ -107,6 +89,58 @@ class T_Artist(BaseModel):
         # 逆参照名を定義(例: 「参照先インスタンス.[related_name]」/通常参照は「本インスタンス.参照先モデル名(_id)」で取得可能)
         related_name="tags_t_artist_set",
     )
+    # -------------------------------------
+    # その他メタ情報
+    # -------------------------------------
+    # Deezer/ID
+    deezer_id = models.CharField(
+        db_column="deezer_id",
+        verbose_name="Deezer/ID",
+        db_comment="Deezer/ID",
+        max_length=255,
+        null=True,
+        blank=True,
+    )
+    # Deezer/自動紐付けフラグ
+    is_deezer_autoset = models.BooleanField(
+        db_column="is_deezer_autoset",
+        verbose_name="Deezer/自動紐付けフラグ",
+        db_comment="Deezer/自動紐付けフラグ",
+        default=False,
+    )
+    # LastFM/アーティスト名
+    lastfm_name = models.CharField(
+        db_column="lastfm_name",
+        verbose_name="LastFM/アーティスト名",
+        db_comment="LastFM/アーティスト名",
+        max_length=255,
+        null=True,
+        blank=True,
+    )
+    # MBID
+    mbid = models.CharField(
+        db_column="mbid",
+        verbose_name="MBID",
+        db_comment="MBID",
+        max_length=100,
+        null=True,
+        blank=True,
+    )
+    # MBID/自動紐付けフラグ
+    is_mbid_autoset = models.BooleanField(
+        db_column="is_mbid_autoset",
+        verbose_name="MBID/自動紐付けフラグ",
+        db_comment="MBID/自動紐付けフラグ",
+        default=False,
+    )
+    # 同期日時
+    sync_at = models.DateTimeField(
+        db_column="sync_at",
+        verbose_name="同期日時",
+        db_comment="同期日時",
+        null=True,
+        blank=True,
+    )
 
     # django-simple-historyを使用
     # history = HistoricalRecords()
@@ -120,11 +154,11 @@ class T_Artist(BaseModel):
         constraints = [
             # 同一ユーザ内に同一アーティストが重複して登録されるのを防ぐ（論理削除考慮）
             UniqueConstraint(
-                fields=["user", "deezer_id"],
+                fields=["user", "spotify_id"],
                 condition=Q(deleted_at__isnull=True),
-                name="unique_t_artist_user_deezer_id_active",
+                name="unique_t_artist_user_spotify_id_active",
             ),
         ]
 
     def __str__(self):
-        return f"{self.name} ({self.deezer_id})"
+        return f"{self.name} ({self.spotify_id}/{self.deezer_id})"

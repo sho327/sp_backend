@@ -1,16 +1,22 @@
 from rest_framework import serializers
 
 # --- アーティストモジュール ---
-from apps.artist.models import M_ArtistTag, M_ArtistContext
+from apps.artist.models import M_ArtistContext, M_ArtistTag
+
 
 class ArtistUpdateRequestSerializer(serializers.Serializer):
     """
     入力：フロントエンドから送られてくるデータの検品
     """
+
     # 更新可能な項目のみ定義(すべて任意項目にすることでPATCHに対応)
-    # 画像についてはSpotify検索結果が正なので、通常変更する想定はないが、直API実行等で一応差し替えれるように入れておく
-    spotify_image_url = serializers.URLField(required=False, allow_null=True)
-    setlistfm_mbid = serializers.CharField(required=False, allow_null=True)
+    display_name = serializers.CharField(required=False, allow_null=True)
+
+    # 基本的に自動設定だが、直接も変えられるように定義
+    deezer_id = serializers.CharField(required=False, allow_null=True)
+    lastfm_name = serializers.CharField(required=False, allow_null=True)
+    mbid = serializers.CharField(required=False, allow_null=True)
+
     # ※PrimaryKeyRelatedFieldを利用
     # serializers.PrimaryKeyRelatedFieldのqueryset にフィルタをかけている場合、
     # DRFはバリデーション時(is_valid()実行時)に以下の挙動を行う
@@ -27,4 +33,3 @@ class ArtistUpdateRequestSerializer(serializers.Serializer):
         required=False,
     )
     # メモやステータスなど、今後増える項目もここに追加
-    
