@@ -261,6 +261,12 @@ UNFOLD = {
                 "collapsible": False,  # Collapsible group of links
                 "items": [
                     {
+                        "title": _("アーティストトラン"),
+                        "icon": "artist",  # Supported icon set: https://fonts.google.com/icons
+                        "link": "/admin/artist/t_artist/",
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                    {
                         "title": _("アーティストコンテキストマスタ"),
                         "icon": "topic",  # Supported icon set: https://fonts.google.com/icons
                         "link": "/admin/artist/m_artistcontext/",
@@ -270,6 +276,38 @@ UNFOLD = {
                         "title": _("アーティストタグマスタ"),
                         "icon": "more",  # Supported icon set: https://fonts.google.com/icons
                         "link": "/admin/artist/m_artisttag/",
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                ],
+            },
+            {
+                "title": _("プレイリスト"),
+                "separator": True,  # Top border
+                "collapsible": True,  # Collapsible group of links
+                "items": [
+                    {
+                        "title": _("プレイリストトラン"),
+                        "icon": "album",  # Supported icon set: https://fonts.google.com/icons
+                        "link": "/admin/playlist/t_playlist/",
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                    {
+                        "title": _("プレイリストトラックトラン"),
+                        "icon": "music_note",  # Supported icon set: https://fonts.google.com/icons
+                        "link": "/admin/playlist/t_playlisttrack/",
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                ],
+            },
+            {
+                "title": _("共通機能"),
+                "separator": True,  # Top border
+                "collapsible": True,  # Collapsible group of links
+                "items": [
+                    {
+                        "title": _("ファイルリソーストラン"),
+                        "icon": "folder",  # Supported icon set: https://fonts.google.com/icons
+                        "link": "/admin/common/t_fileresource/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                 ],

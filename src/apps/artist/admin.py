@@ -30,11 +30,11 @@ class SoftDeleteFilter(admin.SimpleListFilter):
 # ------------------------------------------------------------------
 # Inline
 # ------------------------------------------------------------------
-# class R_ArtistTagInline(TabularInline):
-#     model = R_ArtistTag
-#     extra = 1
-#     fields = ("tag", "created_at")
-#     readonly_fields = ("created_at",)
+class R_ArtistTagInline(TabularInline):
+    model = R_ArtistTag
+    extra = 1
+    fields = ("tag", "created_at")
+    readonly_fields = ("created_at",)
 
 # ------------------------------------------------------------------
 # マスタ系
@@ -79,27 +79,29 @@ class M_ArtistContextAdmin(SaveAdminMixin, ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
-# # ------------------------------------------------------------------
-# # T_Artist
-# # ------------------------------------------------------------------
-# @admin.register(T_Artist)
-# class T_ArtistAdmin(SaveAdminMixin, ModelAdmin):
-#     list_display = ("name", "user", "deezer_id", "context", "created_at", "deleted_at")
-#     list_filter = (SoftDeleteFilter, "context", "user", "deleted_at")
-#     search_fields = ("name", "deezer_id", "user__user_id_display", "user__display_name")
-#     readonly_fields = ("id", "created_at", "updated_at")
-#     inlines = [R_ArtistTagInline]
+# ------------------------------------------------------------------
+# T_Artist
+# ------------------------------------------------------------------
+@admin.register(T_Artist)
+class T_ArtistAdmin(SaveAdminMixin, ModelAdmin):
+    list_display = ("spotify_name", "user", "spotify_id", "context", "created_at", "deleted_at")
+    list_filter = (SoftDeleteFilter, "context", "user", "deleted_at")
+    search_fields = ("spotify_name", "spotify_id", "user__user_id_display", "user__display_name")
+    readonly_fields = ("id", "created_at", "updated_at")
+    inlines = [R_ArtistTagInline]
 
-#     fieldsets = (
-#         (None, {"fields": ("id", "user")}),
-#         ("基本情報", {"fields": ("name", "deezer_id", "deezer_image")}),
-#         ("SetlistFm連携情報", {"fields": ("setlistfm_mbid", "is_mbid_autoset")}),
-#         ("分類・背景", {"fields": ("context",)}),
-#         ("システム情報", {
-#             "fields": ("created_method", "updated_method", "created_at", "updated_at", "deleted_at"),
-#             "classes": ("collapse",)
-#         }),
-#     )
+    fieldsets = (
+        (None, {"fields": ("id", "user")}),
+        ("基本情報", {"fields": ("spotify_name", "spotify_id", "external_icon")}),
+        ("MusicBrainz連携情報", {"fields": ("mbid", "is_mbid_autoset")}),
+        ("Deezer連携情報", {"fields": ("deezer_id", "is_deezer_autoset")}),
+        ("Last.fm連携情報", {"fields": ("lastfm_name",)}),
+        ("分類・背景", {"fields": ("context",)}),
+        ("システム情報", {
+            "fields": ("created_method", "updated_method", "created_at", "updated_at", "deleted_at"),
+            "classes": ("collapse",)
+        }),
+    )
 
 # ------------------------------------------------------------------
 # R_ArtistTag
