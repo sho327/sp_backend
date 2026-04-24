@@ -3,18 +3,19 @@ from datetime import datetime
 
 from django.utils import timezone
 
-# --- アカウントモジュール ---
+# --- アカウントモジュール ---
 from apps.account.models import M_User
 from apps.artist.exceptions import ArtistAlreadyExistsError, ArtistNotFoundError
 
-# --- アーティストモジュール ---
+# --- アーティストモジュール ---
 from apps.artist.models import R_ArtistTag, T_Artist
 
-# --- 共通モジュール ---
+# --- 共通モジュール ---
 from apps.common.models import T_FileResource
 from apps.common.services.deezer_service import DeezerService
 from apps.common.services.musicbrainz_service import MusicBrainzService
 from apps.common.services.spotify_service import SpotifyService
+from apps.common.services.lastfm_service import LastfmService
 from apps.common.services.storage_service import StorageService
 from core.consts import LOG_METHOD
 from core.exceptions.exceptions import ApplicationError
@@ -23,12 +24,13 @@ from core.utils.log_helpers import log_output_by_msg_id
 
 class ArtistService:
     """
-    アーティスト情報の登録・更新・管理を行うサービスクラス
+    アーティスト情報の登録/更新/管理を行うサービスクラス
     """
 
     def __init__(self):
         self.spotify_service = SpotifyService()
         self.deezer_service = DeezerService()
+        self.lastfm_service = LastfmService()
         self.storage_service = StorageService()
         self.musicbrainz_service = MusicBrainzService()
 
@@ -41,16 +43,16 @@ class ArtistService:
         latest_data,
     ):
         """Spotifyの画像情報を使用してT_FileResourceを更新"""
-        # Spotifyの画像配列からURLを取得 (通常 images[0] が最大サイズ)
+        # Spotifyの画像配列からURLを取得(通常 images[0] が最大サイズ)
         images = latest_data.get("images", [])
         new_url = images[0]["url"] if images else None
 
         if not new_url:
             return
 
-        # DB側の画像URLとの差分があれば更新
+        # DB側の画像URLとの差分があれば更新
         if not artist.spotify_image or artist.spotify_image.url != new_url:
-            # 既存画像があれば論理削除
+            # 既存画像があれば論理削除
             if artist.spotify_image:
                 artist.spotify_image.deleted_at = date_now
                 artist.spotify_image.save()
@@ -66,7 +68,11 @@ class ArtistService:
             )
             artist.spotify_image = new_image
 
-    def _link_external_ids(self, name: str, spotify_id: str):
+    def _link_external_ids(
+        self, 
+        name: str, 
+        spotify_id: str
+    ):
         """
         名前とSpotifyIDから、DeezerIDとMusicBrainzID(MBID)を取得/名寄せする
         """
@@ -113,16 +119,21 @@ class ArtistService:
         }
 
     # ------------------------------------------------------------------
-    # 一覧取得系サービス
+    # 一覧取得系サービス
     # ------------------------------------------------------------------
     # アーティスト一覧取得
     def list_artist(
-        self, date_now: datetime, kino_id: str, user: M_User, name=None, tag_ids=None
+        self, 
+        date_now: datetime, 
+        kino_id: str, 
+        user: M_User, 
+        name=None, 
+        tag_ids=None,
     ):
         """
-        フィルタリングを考慮したアーティスト一覧取得
+        フィルタリングを考慮したアーティスト一覧取得
         """
-        # 1. 基本クエリ（自分かつ未削除 ＋ N+1対策）
+        # 1. 基本クエリ(自分かつ未削除 + N+1対策)
         queryset = T_Artist.objects.filter(
             user=user, deleted_at__isnull=True
         ).select_related("external_icon", "context")
@@ -131,7 +142,7 @@ class ArtistService:
         if name:
             queryset = queryset.filter(name__icontains=name)
 
-        # 3. タグフィルター (複数指定可、OR条件)
+        # 3. タグフィルター (複数指定可、OR条件)
         if tag_ids:
             # tag_idsはリスト [uuid, uuid] を想定
             queryset = queryset.filter(tags__id__in=tag_ids).distinct()
@@ -187,7 +198,7 @@ class ArtistService:
                     continue
 
                 # 関連アーティストを取得
-                # Last.fm APIの"match"フィールドを利用
+                # Last.fm APIの"match"フィールドを利用
                 l_artists = self.lastfm_service.get_similar_artists(
                     l_artist_name, limit=_lastfm_related_limit
                 )
@@ -197,12 +208,12 @@ class ArtistService:
                     if l_artist["name"] in original_names:
                         continue
 
-                    # スコアを加算 (Last.fmの match は文字列の数値なのでfloatに変換)
+                    # スコアを加算 (Last.fmの match は文字列の数値なのでfloatに変換)
                     score = float(l_artist.get("match", 0))
                     related_artist_scores[l_artist["name"]] += score
 
             except Exception as e:
-                # ここでログを出して、失敗したアーティストはスキップし、次の処理へ継続
+                # ここでログを出して、失敗したアーティストはスキップし、次の処理へ継続
                 log_output_by_msg_id(
                     log_id="MSGW001",
                     params=[
@@ -212,7 +223,7 @@ class ArtistService:
                 )
                 continue
 
-        # 3. スコアでソートして関連アーティストの上位を抽出
+        # 3. スコアでソートして関連アーティストの上位を抽出
         # items = [("アーティスト名", スコア), ...]
         sorted_related = sorted(
             related_artist_scores.items(), key=lambda x: x[1], reverse=True
@@ -220,10 +231,10 @@ class ArtistService:
         top_related = sorted_related[:get_related_artists_count]
 
         spotify_raw_list = []
-        # 4. 上位の関連アーティストをSpotifyで検索し追加
+        # 4. 上位の関連アーティストをSpotifyで検索し追加
         for name, score in top_related:
             try:
-                # Spotifyで検索してIDを取得
+                # Spotifyで検索してIDを取得
                 spotify_results = self.spotify_service.fetch_search_artists(
                     query=name, limit=1
                 )
@@ -256,7 +267,7 @@ class ArtistService:
             ).values_list("spotify_id", flat=True)
         )
 
-        # 6. データの整形
+        # 6. データの整形
         formatted_results = []
         for s_id, item in spotify_id_map.items():
             images = item.get("images", [])
@@ -274,16 +285,22 @@ class ArtistService:
         return formatted_results
 
     # ------------------------------------------------------------------
-    # 詳細取得系サービス
+    # 詳細取得系サービス
     # ------------------------------------------------------------------
     # アーティスト詳細取得
-    def detail_artist(self, date_now: datetime, kino_id: str, user: M_User, artist_id):
+    def detail_artist(
+        self, 
+        date_now: datetime, 
+        kino_id: str, 
+        user: M_User, 
+        artist_id
+    ):
         """
         特定のアーティスト詳細を取得する(N+1対策済)
         """
         try:
             # select_related: 1対1, 多対1(画像, コンテキスト)
-            # prefetch_related: 多対多(タグ)
+            # prefetch_related: 多対多(タグ)
             artist = (
                 T_Artist.objects.filter(
                     id=artist_id, user=user, deleted_at__isnull=True
@@ -299,7 +316,7 @@ class ArtistService:
             raise ArtistNotFoundError()
 
     # ------------------------------------------------------------------
-    # 登録系サービス
+    # 登録系サービス
     # ------------------------------------------------------------------
     # アーティスト登録
     def create_artist(
@@ -310,7 +327,7 @@ class ArtistService:
         validated_data,
     ):
         """アーティストを新規登録する"""
-        # 1. 重複チェック(論理削除されていない同一SpotifyIDがないか)
+        # 1. 重複チェック(論理削除されていない同一SpotifyIDがないか)
         if T_Artist.objects.filter(
             user=user,
             spotify_id=validated_data["spotify_id"],
@@ -319,7 +336,7 @@ class ArtistService:
             raise ArtistAlreadyExistsError()
 
         # 関連マスタの存在チェック
-        # ※コンテキスト、タグに関してはシリアライザ(PrimaryKeyRelatedField)にて存在チェック済みのため不要
+        # ※コンテキスト、タグに関してはシリアライザ(PrimaryKeyRelatedField)にて存在チェック済みのため不要
 
         # 2. 画像リソース(T_FileResource)の作成
         spotify_image = None
@@ -348,12 +365,11 @@ class ArtistService:
             display_name=validated_data["display_name"],
             external_icon=spotify_image,
             deezer_id=linked_ids["deezer_id"],
-            deezer_name=linked_ids["deezer_name"],
             is_deezer_autoset=linked_ids["is_deezer_autoset"],
             lastfm_name=linked_ids["lastfm_name"],
             mbid=linked_ids["mbid"],
             is_mbid_autoset=linked_ids["is_mbid_autoset"],
-            # validated_data['context_id'] は既にモデルインスタンスになっている
+            # validated_data['context_id'] は既にモデルインスタンスになっている
             context=validated_data.get("context_id"),
             created_by=user,
             created_method=kino_id,
@@ -361,7 +377,7 @@ class ArtistService:
             updated_method=kino_id,
         )
 
-        # 5. タグの紐付け(中間テーブルR_ArtistTagの作成)
+        # 5. タグの紐付け(中間テーブルR_ArtistTagの作成)
         tags = validated_data.get("tag_ids", [])
         if tags:
             tag_links = [
@@ -380,7 +396,7 @@ class ArtistService:
         return artist
 
     # ------------------------------------------------------------------
-    # 更新系サービス
+    # 更新系サービス
     # ------------------------------------------------------------------
     # アーティスト更新
     def update_artist(
@@ -392,7 +408,7 @@ class ArtistService:
         validated_data,
     ):
         """アーティストを新規登録する"""
-        # 1. 対象の取得（存在チェック）
+        # 1. 対象の取得(存在チェック)
         try:
             artist: T_Artist = T_Artist.objects.select_for_update().get(
                 id=artist_id, user=user, deleted_at__isnull=True
@@ -400,7 +416,7 @@ class ArtistService:
         except T_Artist.DoesNotExist:
             raise ArtistNotFoundError()
 
-        # 2. その他のフィールド更新 
+        # 2. その他のフィールド更新 
         if "mbid" in validated_data:
             artist.mbid = validated_data["mbid"]
             artist.is_mbid_autoset = False
@@ -416,12 +432,12 @@ class ArtistService:
         artist.updated_by = user
         artist.save()
 
-        # 3. タグの更新(洗替方式)
+        # 3. タグの更新(洗替方式)
         if "tag_ids" in validated_data:  # validated_dataに含まれているときのみ更新
-            # 既存の紐付けを物理削除(中間テーブルなので物理削除)
+            # 既存の紐付けを物理削除(中間テーブルなので物理削除)
             R_ArtistTag.objects.filter(artist=artist).delete()
 
-            # 新しいタグを登録
+            # 新しいタグを登録
             tags = validated_data["tag_ids"]
             if tags:
                 tag_links = [
@@ -440,13 +456,19 @@ class ArtistService:
         return artist
 
     # ------------------------------------------------------------------
-    # 削除系サービス
+    # 削除系サービス
     # ------------------------------------------------------------------
     # アーティスト削除
-    def delete_artist(elf, date_now: datetime, kino_id: str, user: M_User, artist_id):
+    def delete_artist(
+        self, 
+        date_now: datetime, 
+        kino_id: str, 
+        user: M_User, 
+        artist_id
+    ):
         """アーティストを論理削除する"""
         # 1. 対象の取得
-        # 自分のデータ かつ すでに削除されていないものを対象にする
+        # 自分のデータ かつ すでに削除されていないものを対象にする
         try:
             artist: T_Artist = T_Artist.objects.select_for_update().get(
                 id=artist_id, user=user, deleted_at__isnull=True
@@ -455,7 +477,7 @@ class ArtistService:
             raise ArtistNotFoundError()
 
         # 2. 紐付いている画像の論理削除
-        # external_icon(ForeignKey)が存在する場合、そのレコードも論理削除する
+        # external_icon(ForeignKey)が存在する場合、そのレコードも論理削除する
         if artist.external_icon:
             image_res = artist.external_icon
             image_res.updated_by = user
@@ -464,22 +486,26 @@ class ArtistService:
             image_res.save()
 
         # 3. アーティスト本体の論理削除処理
-        # deleted_at を入れることで、以降のfilter(deleted_at__isnull=True)から除外される
+        # deleted_at を入れることで、以降のfilter(deleted_at__isnull=True)から除外される
         artist.updated_by = user
         artist.updated_method = kino_id
         artist.deleted_at = date_now
         artist.save()
 
-        # 4. タグの更新(中間テーブルは物理削除)
-        # カスケード削除されない中間テーブルのレコードを掃除
+        # 4. タグの更新(中間テーブルは物理削除)
+        # カスケード削除されない中間テーブルのレコードを掃除
         R_ArtistTag.objects.filter(artist=artist).delete()
 
     # ------------------------------------------------------------------
-    # その他サービス
+    # その他サービス
     # ------------------------------------------------------------------
     # アーティスト情報最新化(要: artist_instance)※SpotifyAPI使用
     def refresh_artist(
-        self, date_now: datetime, kino_id: str, user: M_User, artist_instance: T_Artist
+        self, 
+        date_now: datetime, 
+        kino_id: str, 
+        user: M_User, 
+        artist_instance: T_Artist,
     ):
         """
         特定のアーティスト1件をSpotifyの最新情報と同期する
@@ -493,7 +519,7 @@ class ArtistService:
         # 2. 基本情報の更新
         artist_instance.spotify_name = latest_data.get("name", artist_instance.spotify_name)
 
-        # 3. 前回画像と比較し、必要あれば最新化
+        # 3. 前回画像と比較し、必要あれば最新化
         self._update_external_icon(
             date_now=date_now,
             kino_id=kino_id,
@@ -511,7 +537,11 @@ class ArtistService:
 
     # アーティスト情報最新化(要: artist_queryset)※SpotifyAPI使用
     def refresh_artists(
-        self, date_now: datetime, kino_id: str, user: M_User, artist_queryset
+        self, 
+        date_now: datetime, 
+        kino_id: str, 
+        user: M_User, 
+        artist_queryset,
     ):
         """
         QuerySetを受け取り、その中の全アーティストをSpotifyの最新情報と同期する
@@ -521,10 +551,10 @@ class ArtistService:
             return list(artist_queryset)
 
         # 1. Spotifyから一括取得
-        # ※エラーはSpotifyService側から投げられるものを使用
+        # ※エラーはSpotifyService側から投げられるものを使用
         latest_data_list = self.spotify_service.fetch_get_artists(spotify_ids)
 
-        # 2. データをマッピング(SpotifyIDをキーにした辞書にすると更新が楽)
+        # 2. データをマッピング(SpotifyIDをキーにした辞書にすると更新が楽)
         latest_map = {data["id"]: data for data in latest_data_list}
 
         # 3. 更新処理
@@ -534,11 +564,11 @@ class ArtistService:
             if not data:
                 continue
 
-            # ここで1件更新のロジック(get_refreshed_artistの内容)を再利用
-            # 大量更新の場合は、画像URLの変更チェックなどを効率化
+            # ここで1件更新のロジック(get_refreshed_artistの内容)を再利用
+            # 大量更新の場合は、画像URLの変更チェックなどを効率化
             artist.spotify_name = data.get("name", artist.spotify_name)
 
-            # 前回画像と比較し、必要あれば最新化
+            # 前回画像と比較し、必要あれば最新化
             self._update_external_icon(
                 date_now=date_now,
                 kino_id=kino_id,
@@ -556,10 +586,14 @@ class ArtistService:
 
     # アーティスト検索※SpotifyAPI使用
     def search_artist(
-        self, date_now: datetime, kino_id: str, user: M_User, validated_data
+        self, 
+        date_now: datetime, 
+        kino_id: str, 
+        user: M_User, 
+        validated_data,
     ):
         """
-        SpotifyAPIでアーティストを検索し、登録状況を付与して返す
+        SpotifyAPIでアーティストを検索し、登録状況を付与して返す
         """
         query = validated_data.get("q")
         limit = validated_data.get("limit", 10)
@@ -575,7 +609,7 @@ class ArtistService:
         # 2. SpotifyIDの一覧を抽出
         spotify_ids = [str(item["id"]) for item in spotify_raw_list]
 
-        # 3. 自社DBに既に登録されているIDをセットで取得
+        # 3. 自社DBに既に登録されているIDをセットで取得
         registered_ids = set(
             T_Artist.objects.filter(
                 user=user,
@@ -584,12 +618,12 @@ class ArtistService:
             ).values_list("spotify_id", flat=True)
         )
 
-        # 4. データの整形
+        # 4. データの整形
         formatted_results = []
         for item in spotify_raw_list:
             s_id = str(item["id"])
 
-            # Spotifyの画像配列からURLを取得(一番大きいサイズを想定)
+            # Spotifyの画像配列からURLを取得(一番大きいサイズを想定)
             images = item.get("images", [])
             icon_url = images[0]["url"] if images else None
 
