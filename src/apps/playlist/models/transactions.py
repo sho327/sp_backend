@@ -131,6 +131,15 @@ class T_PlaylistTrack(BaseModel):
         db_comment="Spotifyアーティスト名",
         max_length=255,
     )
+    # アーティスト名/表示名
+    display_artist_name = models.CharField(
+        db_column="display_artist_name",
+        verbose_name="アーティスト名/表示名",
+        db_comment="アーティスト名/表示名",
+        max_length=255,
+        null=True,
+        blank=True,
+    )
     # --------------------------------------------------
     # その他トラックメタ情報
     # --------------------------------------------------

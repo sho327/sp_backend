@@ -47,6 +47,7 @@ class CustomPlaylistTrackRequestSerializer(serializers.Serializer):
     spotify_name = serializers.CharField()
     spotify_isrc = serializers.CharField(allow_null=True, required=False)
     spotify_artist_name = serializers.CharField(allow_null=True, required=False)
+    display_artist_name = serializers.CharField(allow_null=True, required=False)
     spotify_popularity = serializers.IntegerField(
         min_value=0, 
         max_value=100,
@@ -66,7 +67,8 @@ class CustomPlaylistTrackResponseSerializer(serializers.Serializer):
     spotify_id = serializers.CharField()
     spotify_name = serializers.CharField()
     spotify_isrc = serializers.CharField(allow_null=True)
-    spotify_artist_name = serializers.CharField(allow_null=True)
+    spotify_artist_name = serializers.CharField()
+    display_artist_name = serializers.CharField(allow_null=True)
     spotify_popularity = serializers.IntegerField()
     spotify_duration_ms = serializers.IntegerField(allow_null=True)
     spotify_album_type = serializers.CharField(allow_null=True)
