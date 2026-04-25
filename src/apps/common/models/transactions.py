@@ -132,7 +132,7 @@ class T_FileResource(BaseModel):
         verbose_name = "ファイルリソーストラン"
         verbose_name_plural = "ファイルリソーストラン"
         constraints = [
-            # 未削除のレコード内でのみ、外部リソースがが重複しないことを保証
+            # 未削除のレコード内でのみ、外部リソースが重複しないことを保証
             UniqueConstraint(
                 fields=["external_url"],
                 # external_url が null でない場合のみチェック

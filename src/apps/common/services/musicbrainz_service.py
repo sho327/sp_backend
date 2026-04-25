@@ -82,6 +82,11 @@ class MusicBrainzService:
         params = {"resource": resource_url, "inc": "artist-rels", "fmt": "json"}
         return self._call_api("/url", params=params)
 
+    def fetch_search_artists(self, query: str, limit: int = 10) -> dict:
+        """Lucene形式のクエリでアーティストを検索"""
+        params = {"query": query, "limit": limit, "fmt": "json"}
+        return self._call_api("/artist", params=params)
+
     # ------------------------------------------------------------------
     # ビジネスロジック
     # ------------------------------------------------------------------

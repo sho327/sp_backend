@@ -80,6 +80,7 @@ class ArtistService:
         is_deezer_autoset = False
         mbid = None
         is_mbid_autoset = False
+        lastfm_name = None
 
         # 1. MBIDの取得
         try:
@@ -110,12 +111,25 @@ class ArtistService:
             )
         except Exception:
             pass
+        
+        # 3. LastFM側を検索し正式名称を取得
+        try:
+            lastfm_name = self.lastfm_service.get_canonical_artist_name(artist_name=name)
+        except ApplicationError as e:
+            log_output_by_msg_id(
+                log_id="MSGW001",
+                params=[f"Warning: Failed to fetch LastFM name for {name}: {str(e)}"],
+                logger_name=LOG_METHOD.APPLICATION.value,
+            )
+        except Exception:
+            pass
 
         return {
             "mbid": mbid,
             "is_mbid_autoset": is_mbid_autoset,
             "deezer_id": deezer_id,
             "is_deezer_autoset": is_deezer_autoset,
+            "lastfm_name": lastfm_name,
         }
 
     # ------------------------------------------------------------------
@@ -344,7 +358,7 @@ class ArtistService:
             spotify_image = T_FileResource.objects.create(
                 file_type=T_FileResource.FileType.IMAGE,
                 external_url=validated_data["icon_url"],
-                file_name=f"spotify_{validated_data['spotify_name']}_icon",
+                file_name=f"spotify_{validated_data['spotify_name']}_image_{date_now.strftime('%Y%m%d')}",
                 created_by=user,
                 created_method=kino_id,
                 updated_by=user,
@@ -366,7 +380,8 @@ class ArtistService:
             external_icon=spotify_image,
             deezer_id=linked_ids["deezer_id"],
             is_deezer_autoset=linked_ids["is_deezer_autoset"],
-            lastfm_name=None,
+            # lastfmの取得はパフォーマンスと要調整(取得をコメントアウト)したいので、「.get()」で最悪Noneで登録させる
+            lastfm_name=linked_ids.get("lastfm_name"),
             mbid=linked_ids["mbid"],
             is_mbid_autoset=linked_ids["is_mbid_autoset"],
             # validated_data['context_id'] は既にモデルインスタンスになっている
@@ -618,7 +633,47 @@ class ArtistService:
             ).values_list("spotify_id", flat=True)
         )
 
-        # 4. データの整形
+        # 4. MusicBrainzから日本語名(display_name)を一括検索・特定してマッピング
+        # (URL検索はヒットしづらいため、名前・エイリアスのOR検索で候補を一括取得する)
+        mb_name_map = {}
+        if spotify_raw_list:
+            # クエリの構築: artist:"名前" OR alias:"名前"
+            query_parts = []
+            for item in spotify_raw_list:
+                clean_name = item["name"].replace('"', '\\"').replace(':', '\\:')
+                query_parts.append(f'artist:"{clean_name}" OR alias:"{clean_name}"')
+            
+            mb_query = " OR ".join(query_parts)
+            try:
+                # 名前ベースのOR検索を実行 (1リクエストで複数候補をさらってくる)
+                mb_search_results = self.musicbrainz_service.fetch_search_artists(mb_query, limit=20)
+                artists = mb_search_results.get("artists", [])
+                
+                # 名前またはエイリアスによるマッピング
+                for mb_artist in artists:
+                    # ===================================================================================================
+                    # MEMO: 効率が悪いので、日本のアーティストだけを対象にする(中国等の対応をする場合はレス速度を犠牲にするか改善が必要)
+                    # ===================================================================================================
+                    if mb_artist.get("country") != "JP":
+                        continue
+                    mb_name = mb_artist.get("name")
+                    mb_aliases = [a.get("name").lower() for a in mb_artist.get("aliases", [])]
+                    
+                    # 候補をSpotify側の名前に紐付ける(大小文字無視)
+                    for item in spotify_raw_list:
+                        s_name = item["name"].lower()
+                        # --- 誤認防止のロジック ---
+                        # 1. MusicBrainzのメイン名とが完全一致する場合を最優先
+                        if s_name == mb_name.lower():
+                            mb_name_map[item["id"]] = mb_name
+                        # 2. メイン名が一致しないが、エイリアスに含まれる場合 (まだ埋まっていない場合のみ)
+                        elif s_name in mb_aliases:
+                            if item["id"] not in mb_name_map:
+                                mb_name_map[item["id"]] = mb_name
+            except Exception:
+                pass
+
+        # 5. データの整形
         formatted_results = []
         for item in spotify_raw_list:
             s_id = str(item["id"])
@@ -628,17 +683,25 @@ class ArtistService:
             images = item.get("images", [])
             icon_url = images[0]["url"] if images else None
 
-            # --- MusicBrainzから日本語名を取得を試行 ---
-            display_name = s_name
-            try:
-                # SpotifyIDからMusicBrainz情報を解決
-                mb_result = self.musicbrainz_service.get_artist_by_spotify_id(s_id)
-                if mb_result and mb_result.get("name"):
-                    # MusicBrainzの登録名(日本アーティストなら通常日本語)を表示名とする
-                    display_name = mb_result.get("name")
-            except Exception:
-                # 取得失敗時はSpotifyの名前を維持
-                pass
+            # --- display_name の決定 ---
+            # 1. まずバルク検索でヒットした MusicBrainz の正名を採用
+            display_name = mb_name_map.get(item["id"])
+            
+            # ===================================================================================================
+            # 2. ヒットしなかった場合は、個別にSpotifyID経由で解決(キャッシュを期待)
+            # ※日本以外も全て取得する場合は下記や上部の一括取得後のcountry="JP"のチェックを外す
+            # ===================================================================================================
+            # if not display_name:
+            #     try:
+            #         mb_result = self.musicbrainz_service.get_artist_by_spotify_id(s_id)
+            #         if mb_result and mb_result.get("name"):
+            #             display_name = mb_result.get("name")
+            #     except Exception:
+            #         pass
+            
+            # どれもダメならSpotifyの名前をそのまま使用
+            if not display_name:
+                display_name = s_name
 
             formatted_results.append(
                 {
