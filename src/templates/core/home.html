@@ -1,0 +1,79 @@
+{% extends 'admin/base.html' %}
+
+{% load i18n %}
+
+{% block title %}
+{% if subtitle %}
+{{ subtitle }} |
+{% endif %}
+
+{{ title }} | {{ site_title|default:_('Django site admin') }}
+{% endblock %}
+
+{% block branding %}
+{% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% load unfold %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold mb-2 dark:text-white">
+        こんにちは、{{ user.email }}さん
+    </h1>
+    <p class="text-sm text-gray-500 mb-6">
+        あなたの活動状況とクイックアクセスです。
+    </p>
+</div>
+
+<!-- 統計カード -->
+<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+    {% component "unfold/components/card.html" with title="登録アーティスト" %}
+    <p class="text-3xl font-bold text-primary-600">{{ my_artists_count }}</p>
+    {% endcomponent %}
+    {% component "unfold/components/card.html" with title="管理プレイリスト" %}
+    <p class="text-3xl font-bold text-purple-600">{{ my_playlists_count }}</p>
+    {% endcomponent %}
+    {% component "unfold/components/card.html" with title="登録済み楽曲" %}
+    <p class="text-3xl font-bold text-green-600">{{ my_tracks_count }}</p>
+    {% endcomponent %}
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <!-- 個人アクティビティ推移 -->
+    <div class="lg:col-span-2">
+        {% component "unfold/components/card.html" with title="直近7日間の登録アクティビティ" %}
+        {% component "unfold/components/chart/line.html" with component_class="PersonalActivityChart" %}
+        {% endcomponent %}
+        {% endcomponent %}
+    </div>
+
+    <!-- クイックアクセス -->
+    <div class="lg:col-span-1">
+        {% component "unfold/components/card.html" with title="クイックアクセス" %}
+        <div class="grid grid-cols-1 gap-2 p-2">
+            {% for shortcut in shortcuts %}
+            <a href="{% url 'admin:'|add:shortcut.url %}" 
+               class="flex items-center gap-3 p-3 rounded-lg border border-base-200 dark:border-base-800 hover:bg-base-50 dark:hover:bg-base-900 transition-colors group">
+                <span class="material-symbols-outlined {{ shortcut.color }} text-[20px]">{{ shortcut.icon }}</span>
+                <span class="text-sm font-bold text-font-important-light dark:text-font-important-dark flex-grow">
+                    {{ shortcut.title }}
+                </span>
+                <span class="material-symbols-outlined text-base-300 group-hover:translate-x-1 transition-transform text-[18px]">chevron_right</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% endcomponent %}
+    </div>
+</div>
+
+<!-- 直近の追加履歴 -->
+<div class="mt-6">
+    {% component "unfold/components/card.html" with title="最近追加した楽曲" %}
+    {% component "unfold/components/table.html" with table=table_data card_included=1 striped=1 %}
+    {% endcomponent %}
+    {% endcomponent %}
+</div>
+
+{{ block.super }}
+{% endblock %}

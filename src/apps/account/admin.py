@@ -1,4 +1,5 @@
 from django.contrib import admin
+from datetime import datetime, date, time
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin
 from simple_history.admin import SimpleHistoryAdmin
@@ -147,6 +148,7 @@ from apps.account.models import T_Profile, T_LoginHistory
 from datetime import timedelta
 from django.utils import timezone
 from unfold.components import BaseComponent, register_component
+from core.utils.date_format import convert_to_site_timezone
 # ------------------------------------------------------------------
 # カスタムページ(ユーザアクティビティ)
 # ------------------------------------------------------------------
@@ -202,17 +204,23 @@ class LoginTrendChart(BaseComponent):
         total_data = []
         success_data = []
         failure_data = []
-        today = timezone.now().date()
+        # プロジェクト設定に基づいた現在の日付を取得
+        today = convert_to_site_timezone(timezone.now()).date()
         
         # 過去7日分のデータを集計
         for i in range(6, -1, -1):
             target_date = today - timedelta(days=i)
             labels.append(target_date.strftime("%m/%d"))
 
-            # データベースから対象日の全ログインログを1次抽出
-            day_queryset = T_LoginHistory.objects.filter(created_at__date=target_date)
+            # 日付の範囲をタイムゾーンを考慮して定義 (00:00:00 〜 23:59:59)
+            # 共通関数 convert_to_site_timezone を通すことでプロジェクト設定(JST等)に合わせる
+            start_datetime = convert_to_site_timezone(datetime.combine(target_date, time.min))
+            end_datetime = convert_to_site_timezone(datetime.combine(target_date, time.max))
+
+            # データベースから対象日の全ログインログを正確な時間範囲で抽出
+            day_queryset = T_LoginHistory.objects.filter(created_at__range=(start_datetime, end_datetime))
             
-            # 成功/失敗をそれぞれカウント（is_successfulフラグを利用）
+            # 成功/失敗をそれぞれカウント
             success_count = day_queryset.filter(is_successful=True).count()
             failure_count = day_queryset.filter(is_successful=False).count()
             
