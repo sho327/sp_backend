@@ -172,9 +172,9 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 UNFOLD = {
-    "SITE_TITLE": "SpotifyMixer 管理画面",
+    "SITE_TITLE": "SpotifyMixer / プレイリスト生成",
     "SITE_HEADER": "SpotifyMixer",
-    "SITE_SUBHEADER": lambda request: "管理者用" if request.user.is_superuser else "一般用",
+    "SITE_SUBHEADER": lambda request: "管理者用" if request and request.user and request.user.is_superuser else "一般用",
     # "SITE_DROPDOWN": [
     #     {
     #         "icon": "diamond",
@@ -257,25 +257,25 @@ UNFOLD = {
                     {
                         "title": _("ユーザマスタ"),
                         "icon": "people",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/admin/account/m_user/",
+                        "link": "/unfold/account/m_user/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                     {
                         "title": _("プロフィールトラン"),
                         "icon": "account_circle",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/admin/account/t_profile/",
+                        "link": "/unfold/account/t_profile/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                     {
                         "title": _("ユーザ発行トークントラン"),
                         "icon": "token",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/admin/account/t_usertoken/",
+                        "link": "/unfold/account/t_usertoken/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                     {
                         "title": _("ログイン履歴トラン"),
                         "icon": "history",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/admin/account/t_loginhistory/",
+                        "link": "/unfold/account/t_loginhistory/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                 ],
@@ -288,19 +288,19 @@ UNFOLD = {
                     {
                         "title": _("アーティストトラン"),
                         "icon": "artist",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/admin/artist/t_artist/",
+                        "link": "/unfold/artist/t_artist/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                     {
                         "title": _("アーティストコンテキストマスタ"),
                         "icon": "topic",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/admin/artist/m_artistcontext/",
+                        "link": "/unfold/artist/m_artistcontext/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                     {
                         "title": _("アーティストタグマスタ"),
                         "icon": "more",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/admin/artist/m_artisttag/",
+                        "link": "/unfold/artist/m_artisttag/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                 ],
@@ -313,13 +313,13 @@ UNFOLD = {
                     {
                         "title": _("プレイリストトラン"),
                         "icon": "album",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/admin/playlist/t_playlist/",
+                        "link": "/unfold/playlist/t_playlist/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                     {
                         "title": _("プレイリストトラックトラン"),
                         "icon": "music_note",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/admin/playlist/t_playlisttrack/",
+                        "link": "/unfold/playlist/t_playlisttrack/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                 ],
@@ -332,7 +332,7 @@ UNFOLD = {
                     {
                         "title": _("ファイルリソーストラン"),
                         "icon": "folder",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/admin/common/t_fileresource/",
+                        "link": "/unfold/common/t_fileresource/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                 ],
@@ -340,6 +340,11 @@ UNFOLD = {
         ],
     },
 }
+
+# ログイン/ログアウト関連(カスタムパス/unfold/に合わせる)
+LOGIN_URL = "/unfold/login/"
+LOGIN_REDIRECT_URL = "/unfold/"
+LOGOUT_REDIRECT_URL = "/unfold/login/"
 
 # ==============================================================================
 # 5. データベース定義、データベース認証方式
@@ -383,11 +388,6 @@ LANGUAGE_CODE = "ja"
 TIME_ZONE = "Asia/Tokyo"
 USE_I18N = True
 USE_TZ = True
-
-# ログイン/ログアウト関連 (カスタムパス /unfold/ に合わせる)
-LOGIN_URL = "/unfold/login/"
-LOGIN_REDIRECT_URL = "/unfold/"
-LOGOUT_REDIRECT_URL = "/unfold/login/"
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/

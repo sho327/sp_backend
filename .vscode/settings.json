@@ -3,59 +3,52 @@
   // 全ファイル形式に対する共通設定
   // ------------------------------------------
   // 1. 保存時の自動フォーマットの設定/有効化
-  // "editor.formatOnSave": true,
-
+  "editor.formatOnSave": true,
   // 2. デフォルトフォーマッタの設定/Pythonファイル以外(HTML,JSなど)のデフォルトフォーマッターはPrettierを使用
-  // "editor.defaultFormatter": "esbenp.prettier-vscode",
-
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
   // 3. isortによるインポート整理を保存時に実行する設定
-  // "editor.codeActionsOnSave": {
-  //   "source.organizeImports": "explicit"
-  // },
-
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit"
+  },
   // 4. タブ関連の設定
-  // "editor.tabSize": 4,
-  // "editor.insertSpaces": false,
-
+  "editor.tabSize": 4,
+  "editor.insertSpaces": false,
   // ------------------------------------------
   // Pythonファイル(.py)に対する設定
   // ------------------------------------------
   "[python]": {
     // PythonファイルのデフォルトのフォーマッターをBlackに設定（最重要）
     "editor.defaultFormatter": "ms-python.black-formatter",
-    
     // 保存時の自動フォーマットの設定/有効化
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
       "source.organizeImports": "explicit",
       "source.fixAll.ruff": "explicit",
     },
-
     // タブ関連の設定/Pythonの標準的な4スペースに上書き(Prettierの4タブ/4スペースと合わせる)
     "editor.tabSize": 4,
     "editor.insertSpaces": true
   },
-
   // Black Formatterの引数設定
-  "python.formatting.blackArgs": ["--line-length", "88"],
-
+  "python.formatting.blackArgs": [
+    "--line-length",
+    "88"
+  ],
   // ------------------------------------------
   // Djangoテンプレート(.html)に対する設定/フォーマット無効化
   // ------------------------------------------
   // HTML/Djangoテンプレートに対して、VSCode組み込みのフォーマットを無効化
-  // "html.format.enable": false,
-
+  "html.format.enable": false,
   // Djangoテンプレートファイル(.htmlまたは.django-html)の設定
-  // "[django-html]": {
+  "[django-html]": {
     // 保存時の自動フォーマットを無効化
-    // "editor.formatOnSave": false,
+    "editor.formatOnSave": false,
     // デフォルトのフォーマッターを強制的に解除
-    // "editor.defaultFormatter": null,
+    "editor.defaultFormatter": null,
     // EmmetをHTMLではなくDjangoテンプレートとして有効化（利便性のため）
-  //   "emmet.includeLanguages": {
-  //     "django-html": "html"
-  //   }
-  // }
-
+    "emmet.includeLanguages": {
+      "django-html": "html"
+    }
+  }
   // Prettierを使っている場合は、.prettierignoreでテンプレートファイルを無視する設定も推奨される
 }
