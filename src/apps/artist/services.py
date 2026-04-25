@@ -585,7 +585,7 @@ class ArtistService:
         return updated_artists
 
     # アーティスト検索※SpotifyAPI使用
-    def search_artist(
+    def search_artists(
         self, 
         date_now: datetime, 
         kino_id: str, 

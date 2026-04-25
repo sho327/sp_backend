@@ -1,0 +1,171 @@
+{% extends 'admin/base.html' %}
+
+{% load i18n %}
+
+{% block title %}
+{% if subtitle %}
+{{ subtitle }} |
+{% endif %}
+
+{{ title }} | {{ site_title|default:_('Django site admin') }}
+{% endblock %}
+
+{% block branding %}
+{% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% load unfold %}
+
+{% block content %}
+<div class="mb-10">
+    {% component "unfold/components/card.html" with title="トラック検索(Spotify)" %}
+    <div class="p-0 lg:px-3 lg:py-6">
+        <form method="get" class="flex flex-col sm:flex-row gap-6 w-full px-4 lg:px-0" style="align-items: end;">
+            {% for field in form %}
+            <div class="w-full sm:w-auto flex-grow flex flex-col">
+                <label class="block font-semibold mb-2 text-sm text-font-important-light dark:text-font-important-dark">
+                    {{ field.label }}
+                </label>
+                {{ field }}
+                {% if field.errors %}
+                <div class="text-red-500 dark:text-red-400 text-xs mt-2 font-medium">
+                    {{ field.errors.0 }}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+            <div class="w-full sm:w-auto sm:flex-shrink-0 flex flex-col">
+                <label class="hidden sm:block font-semibold mb-2 text-sm invisible" aria-hidden="true">&nbsp;</label>
+                {% component "unfold/components/button.html" with submit=1 icon="search" class="w-full h-[38px] px-8" %}
+                検索
+                {% endcomponent %}
+            </div>
+        </form>
+        {% if form.non_field_errors %}
+        <div class="mt-1 lg:mx-0 mx-4 pt-3 px-3 text-red-600 dark:text-red-600 text-sm font-medium">
+            {{ form.non_field_errors.0 }}
+        </div>
+        {% endif %}
+    </div>
+    {% endcomponent %}
+</div>
+
+{% if results %}
+<div class="mb-6 flex items-center justify-between">
+    <h2 class="text-xl font-bold text-font-important-light dark:text-font-important-dark">検索結果</h2>
+    <p class="text-sm text-font-default-light dark:text-font-default-dark">
+        {{ form.limit.value|default:"-" }}件中 1〜{{ results|length }}件を表示
+    </p>
+</div>
+
+<!-- トラック検索結果テーブル -->
+<div class="mb-10">
+    <div
+        class="bg-white flex flex-col grow lg:border lg:border-base-200 lg:overflow-hidden lg:rounded-default lg:shadow-xs lg:dark:border-base-800 dark:bg-base-900">
+        <div class="overflow-x-auto">
+            <table class="border-spacing-none border-separate w-full">
+                <thead class="text-font-important-light dark:text-font-important-dark text-sm">
+                    <tr class="bg-base-50 dark:bg-base-900">
+                        <th
+                            class="align-middle border-b border-base-200 font-semibold py-3 text-center whitespace-nowrap px-4 dark:border-base-800 dark:bg-white/[.02] pl-6 w-12">
+                            #</th>
+                        <th
+                            class="align-middle border-b border-base-200 font-semibold py-3 text-left whitespace-nowrap px-4 dark:border-base-800 dark:bg-white/[.02]">
+                            曲名 / ISRC</th>
+                        <th
+                            class="align-middle border-b border-base-200 font-semibold py-3 text-left whitespace-nowrap px-4 dark:border-base-800 dark:bg-white/[.02]">
+                            アーティスト名</th>
+                        <th
+                            class="align-middle border-b border-base-200 font-semibold py-3 text-left whitespace-nowrap px-4 dark:border-base-800 dark:bg-white/[.02]">
+                            アルバム情報</th>
+                        <th
+                            class="align-middle border-b border-base-200 font-semibold py-3 text-center whitespace-nowrap px-4 dark:border-base-800 dark:bg-white/[.02] w-32">
+                            人気度</th>
+                        <th
+                            class="align-middle border-b border-base-200 font-semibold py-3 text-right whitespace-nowrap px-4 dark:border-base-800 dark:bg-white/[.02] pr-6">
+                            リリース日</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white dark:bg-base-900 text-sm">
+                    {% for track in results %}
+                    <tr class="hover:bg-base-100 dark:hover:bg-base-800 transition-colors group">
+
+                        <td
+                            class="px-4 py-3 align-middle border-t border-base-200 dark:border-base-800 text-font-default-light/60 dark:text-font-default-dark/60 text-center pl-6 font-mono text-xs">
+                            {{ forloop.counter }}
+                        </td>
+
+                        <td class="px-4 py-3 align-middle border-t border-base-200 dark:border-base-800">
+                            <div
+                                class="font-semibold text-font-important-light dark:text-font-important-dark pb-1 text-[13px] whitespace-normal">
+                                {{ track.spotify_name }}
+                            </div>
+                            <div class="flex items-center gap-2 mt-0.5">
+                                {% if track.spotify_isrc %}
+                                <span
+                                    class="text-[10px] bg-base-100 dark:bg-base-800 border border-base-200 dark:border-base-700 px-1.5 py-0.5 rounded text-font-default-light dark:text-font-default-dark font-mono whitespace-nowrap">
+                                    {{ track.spotify_isrc }}
+                                </span>
+                                {% endif %}
+                                <span
+                                    class="text-[11px] text-font-default-light/60 dark:text-font-default-dark/60 font-mono whitespace-nowrap">
+                                    ID: {{ track.spotify_id }}
+                                </span>
+                            </div>
+                        </td>
+
+                        <td
+                            class="px-4 py-3 align-middle border-t border-base-200 dark:border-base-800 text-font-default-light dark:text-font-default-dark font-medium whitespace-normal">
+                            {{ track.spotify_artist_name|default:"-" }}
+                        </td>
+
+                        <td
+                            class="px-4 py-3 align-middle border-t border-base-200 dark:border-base-800 text-font-default-light dark:text-font-default-dark whitespace-normal">
+                            <div class="pb-1">{{ track.spotify_album_name|default:"-" }}</div>
+                            {% if track.spotify_album_type %}
+                            <div
+                                class="text-[10px] text-font-default-light/60 dark:text-font-default-dark/60 uppercase font-semibold">
+                                {{ track.spotify_album_type }}
+                            </div>
+                            {% endif %}
+                        </td>
+
+                        <td class="px-4 py-3 align-middle border-t border-base-200 dark:border-base-800">
+                            {% if track.spotify_popularity is not None %}
+                            <div class="flex items-center justify-center gap-2 w-full">
+                                <span
+                                    class="text-xs font-bold w-5 text-right text-font-important-light dark:text-font-important-dark">
+                                    {{ track.spotify_popularity }}
+                                </span>
+                                <div class="w-16 h-1.5 bg-base-200 dark:bg-base-700 rounded-full overflow-hidden flex">
+                                    <div class="h-full bg-primary-500 transition-all duration-500"
+                                        style="width: {{ track.spotify_popularity }}%;"></div>
+                                </div>
+                            </div>
+                            {% else %}
+                            <span class="text-font-default-light dark:text-font-default-dark block text-center">-</span>
+                            {% endif %}
+                        </td>
+
+                        <td
+                            class="px-4 py-3 align-middle border-t border-base-200 dark:border-base-800 text-right pr-6 whitespace-nowrap">
+                            <div class="pb-1 text-font-default-light dark:text-font-default-dark font-medium">
+                                {{ track.spotify_release_date|default:"-" }}
+                            </div>
+                            {% if track.spotify_duration_ms %}
+                            <div
+                                class="text-[11px] text-font-default-light/60 dark:text-font-default-dark/60 font-mono mt-0.5">
+                                {{ track.spotify_duration_ms }} ms
+                            </div>
+                            {% endif %}
+                        </td>
+
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

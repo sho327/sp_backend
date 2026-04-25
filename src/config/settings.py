@@ -234,6 +234,12 @@ UNFOLD = {
                         "link": reverse_lazy("admin:artist_search"),
                         "permission": lambda request: request.user.is_superuser,
                     },
+                    {
+                        "title": _("トラック検索"),
+                        "icon": "search",  # Supported icon set: https://fonts.google.com/icons
+                        "link": reverse_lazy("admin:track_search"),
+                        "permission": lambda request: request.user.is_superuser,
+                    },
                 ],
             },
             {
@@ -270,7 +276,7 @@ UNFOLD = {
             {
                 "title": _("アーティスト"),
                 "separator": True,  # Top border
-                "collapsible": False,  # Collapsible group of links
+                "collapsible": True,  # Collapsible group of links
                 "items": [
                     {
                         "title": _("アーティストトラン"),
@@ -312,7 +318,7 @@ UNFOLD = {
                 ],
             },
             {
-                "title": _("共通機能"),
+                "title": _("共通"),
                 "separator": True,  # Top border
                 "collapsible": True,  # Collapsible group of links
                 "items": [

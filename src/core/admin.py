@@ -106,6 +106,7 @@ class LoginTrendChart(BaseComponent):
 # ------------------------------------------------------------------
 from django.urls import path
 from apps.artist.admin import ArtistSearchView
+from apps.playlist.admin import TrackSearchView
 
 # モデルに紐づかないサイト全体のカスタムページ用のダミーモデル
 class DummyOpts:
@@ -128,6 +129,7 @@ def get_custom_admin_urls():
     # カスタムURLのリスト
     custom_urls = [
         path("artist_search/", admin.site.admin_view(ArtistSearchView.as_view(model_admin=dummy_admin)), name="artist_search"),
+        path("track_search/", admin.site.admin_view(TrackSearchView.as_view(model_admin=dummy_admin)), name="track_search"),
     ]
     # カスタムURLを元の管理画面のURLに追加
     return custom_urls + urls

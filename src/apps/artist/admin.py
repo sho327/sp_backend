@@ -142,7 +142,7 @@ class ArtistSearchView(UnfoldModelAdminViewMixin, TemplateView):
                 "limit" :form.cleaned_data["limit"],
             }
             # サービス実行(アーティスト検索)※SpotifyAPI使用
-            results = self.artist_service.search_artist(
+            results = self.artist_service.search_artists(
                 date_now=date_now,
                 kino_id="artist_search_admin",
                 user=self.request.user,

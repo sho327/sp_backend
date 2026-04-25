@@ -72,7 +72,7 @@ class ArtistSearchView(BaseAPIView):
         serializer.is_valid(raise_exception=True)
 
         # 3. サービス実行(アーティスト検索)※DeezerAPI使用
-        raw_results = self.artist_service.search_artist(
+        raw_results = self.artist_service.search_artists(
             date_now=date_now,
             kino_id=KINO_ID,
             user=request.user,

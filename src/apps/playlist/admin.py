@@ -87,3 +87,46 @@ class T_PlaylistTrackAdmin(SaveAdminMixin, ModelAdmin):
 #     list_display = ("playlist", "artist", "created_at", "deleted_at")
 #     list_filter = (SoftDeleteFilter, "playlist",)
 #     autocomplete_fields = ["playlist", "artist"]
+
+
+from django.urls import path
+from django.views.generic import TemplateView
+from unfold.views import UnfoldModelAdminViewMixin
+from apps.playlist.forms.track_search import TrackSearchForm
+from apps.playlist.services import PlaylistService
+from django.utils import timezone
+from core.utils.date_format import convert_to_site_timezone
+# ------------------------------------------------------------------
+# カスタムページ(トラック検索)
+# ------------------------------------------------------------------
+class TrackSearchView(UnfoldModelAdminViewMixin, TemplateView):
+    title = "トラック検索"
+    permission_required = ()
+    template_name = "playlist/track_search.html"
+    playlist_service = PlaylistService()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        date_now: datetime = convert_to_site_timezone(timezone.now())
+        form = TrackSearchForm(self.request.GET or None)
+        results = None
+
+        if form.is_valid():
+            data = {
+                "search_artist_name" :form.cleaned_data["search_artist_name"],
+                "search_track_name" :form.cleaned_data["search_track_name"],
+                "limit" :form.cleaned_data["limit"],
+            }
+            # サービス実行(トラック検索)※SpotifyAPI使用
+            results = self.playlist_service.search_tracks(
+                date_now=date_now,
+                kino_id="track_search_admin",
+                user=self.request.user,
+                validated_data=data,
+            )
+
+        context.update({
+            "form": form,
+            "results": results,
+        })
+        return context
