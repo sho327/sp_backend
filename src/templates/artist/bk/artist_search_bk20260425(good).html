@@ -18,8 +18,8 @@
 
 {% block content %}
 <div class="mb-10">
-    {% component "unfold/components/card.html" with title="アーティスト検索(Spotify)" %}
-    <div class="p-0 lg:px-3 lg:py-6">
+    {% component "unfold/components/card.html" with title="アーティストをSpotifyから検索" %}
+    <div class="p-0 lg:p-6">
         <form method="get" class="flex flex-col sm:flex-row gap-6 w-full" style="align-items: end;">
             {% for field in form %}
             <div class="w-full sm:w-auto flex-grow flex flex-col">
@@ -61,13 +61,13 @@
             <div class="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 z-10 w-max max-w-full">
                 {% if artist.is_registered %}
                 <span
-                    class="bg-green-600 text-white text-xs font-bold px-2 py-0.5 sm:px-3 sm:py-1 rounded-full shadow border-2 border-white dark:border-gray-800 flex items-center gap-1">
+                    class="bg-green-600 text-white text-[10px] sm:text-[11px] font-bold px-2 py-0.5 sm:px-3 sm:py-1 rounded-full shadow border-2 border-white dark:border-gray-800 flex items-center gap-1">
                     <span class="material-symbols-outlined text-[14px]">check_circle</span>
                     登録済
                 </span>
                 {% else %}
                 <span
-                    class="bg-base-200 dark:bg-base-700 text-font-important-light dark:text-font-important-dark text-xs font-bold px-2 py-0.5 sm:px-3 sm:py-1 rounded-full shadow border-2 border-white dark:border-base-900 flex items-center gap-1">
+                    class="bg-base-200 dark:bg-base-700 text-font-important-light dark:text-font-important-dark text-[10px] sm:text-[11px] font-bold px-2 py-0.5 sm:px-3 sm:py-1 rounded-full shadow border-2 border-white dark:border-base-900 flex items-center gap-1">
                     未登録
                 </span>
                 {% endif %}

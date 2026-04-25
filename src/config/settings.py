@@ -218,7 +218,7 @@ UNFOLD = {
         # "show_all_applications": True,  # Dropdown with all applications and models
         "navigation": [
             {
-                "title": _("ホーム"),
+                "title": _("カスタムページ"),
                 "separator": False,  # Top border
                 "collapsible": False,  # Collapsible group of links
                 "items": [
@@ -228,13 +228,6 @@ UNFOLD = {
                         "link": reverse_lazy("admin:index"),
                         "permission": lambda request: request.user.is_superuser,
                     },
-                ],
-            },
-            {
-                "title": _("カスタムページ"),
-                "separator": True,  # Top border
-                "collapsible": True,  # Collapsible group of links
-                "items": [
                     {
                         "title": _("アーティスト検索"),
                         "icon": "search",  # Supported icon set: https://fonts.google.com/icons

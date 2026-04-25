@@ -1,0 +1,109 @@
+{% extends 'admin/base.html' %}
+
+{% load i18n %}
+
+{% block title %}
+{% if subtitle %}
+{{ subtitle }} |
+{% endif %}
+
+{{ title }} | {{ site_title|default:_('Django site admin') }}
+{% endblock %}
+
+{% block branding %}
+{% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% load unfold %}
+
+{% block content %}
+<div class="mb-6">
+    {% component "unfold/components/card.html" with title="アーティスト検索(SpotifyAPI使用)" %}
+    <div class="p-4">
+        <form method="get" class="flex flex-col sm:flex-row items-end gap-6">
+            <!-- フォームフィールド -->
+            <div class="flex-grow flex flex-col sm:flex-row gap-4">
+                {% for field in form %}
+                <div class="flex flex-col flex-1 max-w-sm">
+                    <label
+                        class="block font-semibold mb-2 text-font-important-light text-sm dark:text-font-important-dark">
+                        {{ field.label }}
+                    </label>
+                    {{ field }}
+                </div>
+                {% endfor %}
+            </div>
+            <!-- 検索ボタン -->
+            <div>
+                <button type="submit"
+                    class="bg-primary-600 border border-transparent cursor-pointer font-medium px-6 py-2 rounded-default text-center text-white whitespace-nowrap hover:bg-primary-700 transition duration-200">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-lg">search</span>
+                        検索
+                    </div>
+                </button>
+            </div>
+        </form>
+    </div>
+    {% endcomponent %}
+</div>
+
+{% if results %}
+<div>
+    {% component "unfold/components/card.html" with title="検索結果" %}
+    <div class="overflow-x-auto p-0">
+        <table class="w-full text-left text-sm text-gray-600 dark:text-gray-300">
+            <thead
+                class="border-b border-gray-200 bg-gray-50 text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400">
+                <tr>
+                    <th class="px-6 py-3 font-semibold whitespace-nowrap w-16">アイコン</th>
+                    <th class="px-6 py-3 font-semibold whitespace-nowrap">アーティスト名</th>
+                    <th class="px-6 py-3 font-semibold whitespace-nowrap">Spotify ID</th>
+                    <th class="px-6 py-3 font-semibold text-center whitespace-nowrap w-32">登録状態</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for artist in results %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                    <td class="px-6 py-3">
+                        {% if artist.icon_url %}
+                        <img src="{{ artist.icon_url }}" alt="{{ artist.spotify_name }}"
+                            class="w-10 h-10 rounded-full object-cover shadow-sm bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
+                        {% else %}
+                        <div
+                            class="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center text-gray-400">
+                            <span class="material-symbols-outlined text-lg">person</span>
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-3 font-medium text-gray-900 dark:text-gray-100">
+                        {{ artist.spotify_name }}
+                    </td>
+                    <td class="px-6 py-3">
+                        <code
+                            class="text-xs bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-700 font-mono">
+                                {{ artist.spotify_id }}
+                            </code>
+                    </td>
+                    <td class="px-6 py-3 text-center">
+                        {% if artist.is_registered %}
+                        <span
+                            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800/50">
+                            <span class="material-symbols-outlined text-[14px]">check_circle</span> 登録済
+                        </span>
+                        {% else %}
+                        <span
+                            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700">
+                            <span class="material-symbols-outlined text-[14px]">radio_button_unchecked</span> 未登録
+                        </span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endcomponent %}
+</div>
+{% endif %}
+{% endblock %}

@@ -154,12 +154,3 @@ class ArtistSearchView(UnfoldModelAdminViewMixin, TemplateView):
             "results": results,
         })
         return context
-
-class ArtistSearchAdmin(admin.AdminSite):
-
-    def get_urls(self):
-        urls = super().get_urls()
-        custom_urls = [
-            path("artist_search/", self.admin_view(ArtistSearchView.as_view(model_admin=self)), name="artist_search"),
-        ]
-        return urls + custom_urls

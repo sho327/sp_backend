@@ -1,7 +1,18 @@
 from django import forms
-
-from apps.artist.models import T_Artist
+from unfold.widgets import UnfoldAdminTextInputWidget, UnfoldAdminIntegerFieldWidget
 
 class ArtistSearchForm(forms.Form):
-    q = forms.CharField(required=False, max_length=255)
-    limit = forms.IntegerField(required=False, min_value=1, max_value=10, initial=10)
+    q = forms.CharField(
+        label="アーティスト名",
+        required=False, 
+        max_length=255,
+        widget=UnfoldAdminTextInputWidget(attrs={"placeholder": "例: YOASOBI"})
+    )
+    limit = forms.IntegerField(
+        label="取得件数",
+        required=False, 
+        min_value=1, 
+        max_value=20, 
+        initial=10,
+        widget=UnfoldAdminIntegerFieldWidget()
+    )
