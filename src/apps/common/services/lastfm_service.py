@@ -17,8 +17,17 @@ class LastfmService:
     def _call_api(self, method: str, params: dict = None) -> dict:
         """
         API実行・エラーハンドリング・ログ出力の共通ラッパー
-        Last.fmはクエリパラメータでmethodを指定する仕様
         """
+        if not self.api_key:
+            log_output_by_msg_id(
+                log_id="MSGW001",
+                params=["Last.fm API Key is not set. Skipping API call."],
+                logger_name=LOG_METHOD.APPLICATION.value,
+            )
+            # APIキーがない場合は、空の結果（エラーではない）として扱うか、
+            # 呼び出し元がハンドリングできるよう空の構造を返す
+            return {"results": {"artistmatches": {"artist": []}}}
+
         if params is None:
             params = {}
         

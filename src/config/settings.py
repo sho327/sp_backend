@@ -405,6 +405,8 @@ SPOTIFY_CLIENT_ID = env("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = env("SPOTIFY_CLIENT_SECRET")
 # SetListFM/API
 SETLIST_FM_APIKEY = env("SETLIST_FM_APIKEY")
+# Last.fm/API
+LASTFM_APIKEY = env("LASTFM_APIKEY")
 
 # ==============================================================================
 # 8. ログ設定
