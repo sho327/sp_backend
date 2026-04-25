@@ -1,0 +1,66 @@
+{% extends 'admin/base.html' %}
+
+{% load i18n %}
+
+{% block title %}
+{% if subtitle %}
+{{ subtitle }} |
+{% endif %}
+
+{{ title }} | {{ site_title|default:_('Django site admin') }}
+{% endblock %}
+
+{% block branding %}
+{% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% load unfold %}
+
+{% block content %}
+<!-- <h1 class="text-2xl font-bold mb-6 dark:text-white">
+        ダッシュボード
+    </h1> -->
+<!-- 公式サイト確認: https://unfoldadmin.com/docs/installation/quickstart/ -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    {% component "unfold/components/card.html" with title="アクティブユーザ" %}
+    <p class="text-3xl font-bold text-green-600">{{ active_users }}</p>
+    {% endcomponent %}
+    {% component "unfold/components/card.html" with title="ロック中ユーザ" %}
+    <p class="text-3xl font-bold text-yellow-600">{{ locked_users }}</p>
+    {% endcomponent %}
+    {% component "unfold/components/card.html" with title="凍結中ユーザ" %}
+    <p class="text-3xl font-bold text-red-600">{{ frozen_users }}</p>
+    {% endcomponent %}
+    {% component "unfold/components/card.html" with title="退会済ユーザ" %}
+    <p class="text-3xl font-bold text-gray-500">{{ withdrawn_users }}</p>
+    {% endcomponent %}
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2">
+        {% component "unfold/components/card.html" with title="直近7日間のログイン試行推移" %}
+        {% component "unfold/components/chart/line.html" with component_class="LoginTrendChart" %}
+        {% endcomponent %}
+        {% endcomponent %}
+    </div>
+
+    <div class="lg:col-span-1">
+        {% component "unfold/components/card.html" with title="初期設定完了率" %}
+        <div class="p-4">
+            {% component "unfold/components/progress.html" with value=setup_completion_percent %}
+            {% endcomponent %}
+            <p class="text-sm text-gray-500 mt-2">現在 {{ setup_completion_percent }}%</p>
+        </div>
+        {% endcomponent %}
+    </div>
+</div>
+
+<div class="mt-6">
+    {% component "unfold/components/card.html" with title="最新のログイン失敗ログ" %}
+    {% component "unfold/components/table.html" with table=table_data card_included=1 striped=1 %}
+    {% endcomponent %}
+    {% endcomponent %}
+</div>
+
+{{ block.super }}
+{% endblock %}

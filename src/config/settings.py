@@ -229,6 +229,12 @@ UNFOLD = {
                         "permission": lambda request: request.user.is_superuser,
                     },
                     {
+                        "title": _("ユーザアクティビティ"),
+                        "icon": "browse_activity",  # Supported icon set: https://fonts.google.com/icons
+                        "link": reverse_lazy("admin:user_activity"),
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                    {
                         "title": _("アーティスト検索"),
                         "icon": "search",  # Supported icon set: https://fonts.google.com/icons
                         "link": reverse_lazy("admin:artist_search"),

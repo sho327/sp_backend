@@ -176,11 +176,19 @@
                         <td
                             class="px-4 py-3 align-middle border-t border-base-200 dark:border-base-800 text-right pr-6 whitespace-nowrap">
                             {{ track|json_script:track.spotify_id }}
-                            <button type="button" onclick="openAddModal('{{ track.spotify_id }}')"
-                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-full shadow transition-colors">
+                            {% if track.is_fully_added %}
+                            <span
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-base-100 dark:bg-base-800 text-font-default-light/50 dark:text-font-default-dark/50 text-xs font-bold rounded-full border border-base-200 dark:border-base-700 whitespace-nowrap">
+                                <span class="material-symbols-outlined text-[16px]">check_circle</span>
+                                登録済み
+                            </span>
+                            {% else %}
+                            <button type="button" onclick="openAddModal('{{ track.spotify_id }}', {{ track.added_playlist_ids|default:'[]'|safe }})"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-full shadow transition-colors whitespace-nowrap">
                                 <span class="material-symbols-outlined text-[16px]">add</span>
                                 追加
                             </button>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -298,13 +306,41 @@
 {% endif %}
 
 <script>
-    function openAddModal(trackId) {
+    function openAddModal(trackId, addedPlaylistIds = []) {
         const scriptTag = document.getElementById(trackId);
         if (!scriptTag) return;
 
         const data = JSON.parse(scriptTag.textContent);
         document.getElementById('modal-track-name').textContent = data.spotify_name;
         document.getElementById('modal-artist-name').textContent = data.display_artist_name || data.spotify_artist_name;
+
+        // すべてのラジオボタンとラベルの状態をリセット
+        document.querySelectorAll('input[name="playlist_id"]').forEach(radio => {
+            const label = radio.closest('label');
+            const isAdded = addedPlaylistIds.includes(String(radio.value));
+            
+            radio.disabled = isAdded;
+            radio.checked = false; // 選択解除
+
+            if (isAdded) {
+                label.classList.add('opacity-50', 'bg-base-50', 'dark:bg-base-900', 'cursor-not-allowed', 'filter', 'grayscale-[0.5]');
+                label.classList.remove('hover:bg-base-100', 'dark:hover:bg-base-800', 'cursor-pointer');
+                
+                // 追加済みラベル（既にあれば更新、なければ作成）
+                if (!label.querySelector('.added-status')) {
+                    const status = document.createElement('span');
+                    status.className = 'added-status absolute top-2 right-2 flex items-center gap-1 text-[10px] font-bold text-base-400 bg-base-200 dark:bg-base-800 px-2 py-0.5 rounded-full';
+                    status.innerHTML = '<span class="material-symbols-outlined text-[12px]">check</span> 登録済み';
+                    label.classList.add('relative');
+                    label.appendChild(status);
+                }
+            } else {
+                label.classList.remove('opacity-50', 'bg-base-50', 'dark:bg-base-900', 'cursor-not-allowed', 'filter', 'grayscale-[0.5]', 'relative');
+                label.classList.add('hover:bg-base-100', 'dark:hover:bg-base-800', 'cursor-pointer');
+                const status = label.querySelector('.added-status');
+                if (status) status.remove();
+            }
+        });
 
         const container = document.getElementById('hidden-inputs-container');
         container.innerHTML = '';

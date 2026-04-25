@@ -12,7 +12,7 @@ class SaveAdminMixin:
         obj.updated_by = request.user
         obj.updated_method = "admin_panel"
         super().save_model(request, obj, form, change)
-    
+
     # SHOW_VIEW_ON_SITEがTrueの場合だけ設定される
     # def view_on_site(self, obj):
     #     return "http://localhost:3000/dashboard"
@@ -64,9 +64,9 @@ class T_PlaylistAdmin(SaveAdminMixin, ModelAdmin):
 
 @admin.register(T_PlaylistTrack)
 class T_PlaylistTrackAdmin(SaveAdminMixin, ModelAdmin):
-    list_display = ("spotify_name", "spotify_artist_name", "playlist", "spotify_popularity", "deleted_at")
+    list_display = ("spotify_name", "display_artist_name", "spotify_artist_name", "playlist", "deleted_at")
     list_filter = (SoftDeleteFilter, "playlist", "spotify_album_type")
-    search_fields = ("spotify_name", "spotify_artist_name", "spotify_id")
+    search_fields = ("spotify_name", "display_artist_name", "spotify_artist_name", "spotify_id")
     readonly_fields = ("id", "created_at", "updated_at")
 
     fieldsets = (
@@ -131,10 +131,34 @@ class TrackSearchView(UnfoldModelAdminViewMixin, TemplateView):
                 validated_data=data,
             )
 
+        # 検索結果の各トラックに既登録情報を付与
+        user_playlists = T_Playlist.objects.filter(user=self.request.user, deleted_at__isnull=True)
+        total_playlist_count = user_playlists.count()
+
+        if results:
+            tracks_in_playlists = T_PlaylistTrack.objects.filter(
+                playlist__in=user_playlists,
+                deleted_at__isnull=True
+            ).values("spotify_id", "playlist_id")
+            
+            track_playlist_map = {}
+            for item in tracks_in_playlists:
+                sid = item["spotify_id"]
+                pid = str(item["playlist_id"])
+                if sid not in track_playlist_map:
+                    track_playlist_map[sid] = []
+                track_playlist_map[sid].append(pid)
+
+            for track in results:
+                added_ids = track_playlist_map.get(track["spotify_id"], [])
+                track["added_playlist_ids"] = added_ids
+                # すべてのプレイリストに追加済みか判定
+                track["is_fully_added"] = (len(added_ids) >= total_playlist_count) and (total_playlist_count > 0)
+
         context.update({
             "form": form,
             "results": results,
-            "playlists": T_Playlist.objects.filter(user=self.request.user, deleted_at__isnull=True).order_by("-updated_at"),
+            "playlists": user_playlists.order_by("-updated_at"),
         })
         return context
 
