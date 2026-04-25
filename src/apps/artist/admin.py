@@ -84,15 +84,15 @@ class M_ArtistContextAdmin(SaveAdminMixin, ModelAdmin):
 # ------------------------------------------------------------------
 @admin.register(T_Artist)
 class T_ArtistAdmin(SaveAdminMixin, ModelAdmin):
-    list_display = ("spotify_name", "user", "spotify_id", "context", "created_at", "deleted_at")
+    list_display = ("display_name", "user", "spotify_id", "spotify_name", "created_at", "deleted_at")
     list_filter = (SoftDeleteFilter, "context", "user", "deleted_at")
-    search_fields = ("spotify_name", "spotify_id", "user__user_id_display", "user__display_name")
+    search_fields = ("display_name", "spotify_name", "spotify_id")
     readonly_fields = ("id", "created_at", "updated_at")
     inlines = [R_ArtistTagInline]
 
     fieldsets = (
         (None, {"fields": ("id", "user")}),
-        ("基本情報", {"fields": ("spotify_name", "spotify_id", "external_icon")}),
+        ("基本情報", {"fields": ("display_name", "spotify_name", "spotify_id", "external_icon")}),
         ("MusicBrainz連携情報", {"fields": ("mbid", "is_mbid_autoset")}),
         ("Deezer連携情報", {"fields": ("deezer_id", "is_deezer_autoset")}),
         ("Last.fm連携情報", {"fields": ("lastfm_name",)}),

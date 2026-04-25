@@ -168,4 +168,25 @@
     </div>
 </div>
 {% endif %}
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+            form.addEventListener('submit', function() {
+                const submitBtns = form.querySelectorAll('button[type="submit"]');
+                submitBtns.forEach(btn => {
+                    // Prevent double clicks
+                    btn.disabled = true;
+                    btn.classList.add('opacity-70', 'cursor-not-allowed');
+                    
+                    // Update button content to show loading state
+                    if (btn.innerText.includes('検索')) {
+                        btn.innerHTML = '<span class="material-symbols-outlined mr-2 animate-spin text-[18px]">sync</span> 検索中...';
+                    }
+                });
+            });
+        });
+    });
+</script>
 {% endblock %}
