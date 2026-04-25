@@ -82,8 +82,11 @@
                             class="align-middle border-b border-base-200 font-semibold py-3 text-center whitespace-nowrap px-4 dark:border-base-800 dark:bg-white/[.02] w-32">
                             人気度</th>
                         <th
-                            class="align-middle border-b border-base-200 font-semibold py-3 text-right whitespace-nowrap px-4 dark:border-base-800 dark:bg-white/[.02] pr-6">
+                            class="align-middle border-b border-base-200 font-semibold py-3 text-right whitespace-nowrap px-4 dark:border-base-800 dark:bg-white/[.02]">
                             リリース日</th>
+                        <th
+                            class="align-middle border-b border-base-200 font-semibold py-3 text-right whitespace-nowrap px-4 dark:border-base-800 dark:bg-white/[.02] pr-6 w-24">
+                            操作</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white dark:bg-base-900 text-sm">
@@ -117,14 +120,15 @@
                         <td
                             class="px-4 py-3 align-middle border-t border-base-200 dark:border-base-800 text-font-default-light dark:text-font-default-dark font-medium whitespace-normal">
                             {% if track.display_artist_name %}
-                                {{ track.display_artist_name }}
-                                {% if track.display_artist_name != track.spotify_artist_name %}
-                                <div class="text-[10px] text-font-default-light/60 dark:text-font-default-dark/60 font-normal">
-                                    ({{ track.spotify_artist_name }})
-                                </div>
-                                {% endif %}
+                            {{ track.display_artist_name }}
+                            {% if track.display_artist_name != track.spotify_artist_name %}
+                            <div
+                                class="text-[10px] text-font-default-light/60 dark:text-font-default-dark/60 font-normal">
+                                ({{ track.spotify_artist_name }})
+                            </div>
+                            {% endif %}
                             {% else %}
-                                {{ track.spotify_artist_name|default:"-" }}
+                            {{ track.spotify_artist_name|default:"-" }}
                             {% endif %}
                         </td>
 
@@ -157,7 +161,7 @@
                         </td>
 
                         <td
-                            class="px-4 py-3 align-middle border-t border-base-200 dark:border-base-800 text-right pr-6 whitespace-nowrap">
+                            class="px-4 py-3 align-middle border-t border-base-200 dark:border-base-800 text-right whitespace-nowrap">
                             <div class="pb-1 text-font-default-light dark:text-font-default-dark font-medium">
                                 {{ track.spotify_release_date|default:"-" }}
                             </div>
@@ -169,6 +173,15 @@
                             {% endif %}
                         </td>
 
+                        <td
+                            class="px-4 py-3 align-middle border-t border-base-200 dark:border-base-800 text-right pr-6 whitespace-nowrap">
+                            {{ track|json_script:track.spotify_id }}
+                            <button type="button" onclick="openAddModal('{{ track.spotify_id }}')"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-full shadow transition-colors">
+                                <span class="material-symbols-outlined text-[16px]">add</span>
+                                追加
+                            </button>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -176,22 +189,145 @@
         </div>
     </div>
 </div>
+
+<!-- プレイリスト選択モーダル -->
+<div id="add-track-modal" class="fixed inset-0 z-[100] hidden overflow-y-auto" aria-labelledby="modal-title"
+    role="dialog" aria-modal="true">
+    <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity bg-base-900/60 backdrop-blur-sm" aria-hidden="true"
+            onclick="closeAddModal()"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="relative inline-block align-bottom bg-white dark:bg-base-900 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-xl sm:w-full border border-base-200 dark:border-base-800"
+            onclick="event.stopPropagation()">
+            <form method="post" id="add-track-form">
+                {% csrf_token %}
+                <div class="px-4 pt-5 pb-4 sm:p-6 sm:pb-4 border-b border-base-200 dark:border-base-800">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                            <h3 class="text-lg leading-6 font-bold text-font-important-light dark:text-font-important-dark"
+                                id="modal-title">
+                                プレイリストに追加
+                            </h3>
+                            <div class="mt-2">
+                                <p class="text-sm text-font-default-light dark:text-font-default-dark">
+                                    追加するプレイリストを選択してください。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- トラック情報（表示用） -->
+                <div class="px-6 py-4 bg-base-50 dark:bg-white/[.02] flex items-center gap-4">
+                    <div class="flex-grow overflow-hidden">
+                        <div id="modal-track-name"
+                            class="font-bold text-sm truncate text-font-important-light dark:text-font-important-dark">
+                        </div>
+                        <div id="modal-artist-name"
+                            class="text-xs text-font-default-light dark:text-font-default-dark truncate"></div>
+                    </div>
+                </div>
+
+                <!-- プレイリスト一覧 -->
+                <div class="px-4 py-2 max-h-[400px] overflow-y-auto">
+                    {% if playlists %}
+                    <div class="grid grid-cols-1 gap-2 p-2">
+                        {% for playlist in playlists %}
+                        <label
+                            class="flex items-center p-3 rounded-lg hover:bg-base-100 dark:hover:bg-base-800 cursor-pointer transition-colors border border-base-200 dark:hover:border-base-700 group">
+                            <input type="radio" name="playlist_id" value="{{ playlist.id }}"
+                                class="w-4 h-4 text-primary-600 border-base-300 focus:ring-primary-500 bg-white dark:bg-base-900"
+                                required>
+                            <div class="ml-4 flex items-center gap-4">
+                                {% if playlist.image %}
+                                <img src="{{ playlist.image.url }}" class="w-10 h-10 rounded shadow-sm object-cover">
+                                {% else %}
+                                <div
+                                    class="w-10 h-10 rounded bg-base-200 dark:bg-base-800 flex items-center justify-center flex-shrink-0">
+                                    <span class="material-symbols-outlined text-[20px] text-base-400">queue_music</span>
+                                </div>
+                                {% endif %}
+                                <div class="flex flex-col">
+                                    <span
+                                        class="text-sm font-bold text-font-important-light dark:text-font-important-dark group-hover:text-primary-600 transition-colors">
+                                        {{ playlist.title }}
+                                    </span>
+                                    <span
+                                        class="text-[10px] text-font-default-light/60 dark:text-font-default-dark/60 italic">
+                                        ID: {{ playlist.id|truncatechars:8 }}
+                                    </span>
+                                </div>
+                            </div>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="py-10 text-center">
+                        <p class="text-sm text-font-default-light dark:text-font-default-dark italic">
+                            有効なプレイリストが見つかりません。
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div id="hidden-inputs-container"></div>
+
+                <div
+                    class="px-4 py-4 sm:px-6 sm:flex sm:flex-row-reverse gap-3 border-t border-base-200 dark:border-base-800 bg-base-50 dark:bg-white/[.02]">
+                    <button type="submit"
+                        class="w-full inline-flex justify-center rounded-full border border-transparent shadow-sm px-8 py-2 bg-primary-600 text-base font-bold text-white hover:bg-primary-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm transition-colors">
+                        追加する
+                    </button>
+                    <button type="button" onclick="closeAddModal()"
+                        class="mt-3 w-full inline-flex justify-center rounded-full border border-base-300 dark:border-base-700 shadow-sm px-6 py-2 bg-white dark:bg-base-900 text-base font-medium text-font-default-light dark:text-font-default-dark hover:bg-base-50 dark:hover:bg-base-800 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors">
+                        キャンセル
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endif %}
 
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
+    function openAddModal(trackId) {
+        // json_script からパース
+        const scriptTag = document.getElementById(trackId);
+        if (!scriptTag) return;
+
+        const data = JSON.parse(scriptTag.textContent);
+        document.getElementById('modal-track-name').textContent = data.spotify_name;
+        document.getElementById('modal-artist-name').textContent = data.display_artist_name || data.spotify_artist_name;
+
+        const container = document.getElementById('hidden-inputs-container');
+        container.innerHTML = '';
+        Object.keys(data).forEach(key => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = data[key] || '';
+            container.appendChild(input);
+        });
+
+        document.getElementById('add-track-modal').classList.remove('hidden');
+    }
+
+    function closeAddModal() {
+        document.getElementById('add-track-modal').classList.add('hidden');
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
         const forms = document.querySelectorAll('form');
         forms.forEach(form => {
-            form.addEventListener('submit', function() {
+            form.addEventListener('submit', function () {
                 const submitBtns = form.querySelectorAll('button[type="submit"]');
                 submitBtns.forEach(btn => {
-                    // Prevent double clicks
                     btn.disabled = true;
                     btn.classList.add('opacity-70', 'cursor-not-allowed');
-                    
-                    // Update button content to show loading state
                     if (btn.innerText.includes('検索')) {
                         btn.innerHTML = '<span class="material-symbols-outlined mr-2 animate-spin text-[18px]">sync</span> 検索中...';
+                    } else if (btn.innerText.includes('追加')) {
+                        btn.innerHTML = '<span class="material-symbols-outlined mr-2 animate-spin text-[18px]">sync</span> 追加中...';
                     }
                 });
             });

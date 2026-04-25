@@ -131,5 +131,45 @@ class TrackSearchView(UnfoldModelAdminViewMixin, TemplateView):
         context.update({
             "form": form,
             "results": results,
+            "playlists": T_Playlist.objects.filter(user=self.request.user, deleted_at__isnull=True).order_by("-updated_at"),
         })
         return context
+
+    def post(self, request, *args, **kwargs):
+        playlist_id = request.POST.get("playlist_id")
+        if not playlist_id:
+            messages.error(request, "追加先のプレイリストを選択してください。")
+            return redirect(request.get_full_path())
+
+        # POSTデータから楽曲情報を抽出
+        track_data = {
+            "spotify_id": request.POST.get("spotify_id"),
+            "spotify_name": request.POST.get("spotify_name"),
+            "spotify_artist_id": request.POST.get("spotify_artist_id"),
+            "spotify_artist_name": request.POST.get("spotify_artist_name"),
+            "display_artist_name": request.POST.get("display_artist_name"),
+            "spotify_album_id": request.POST.get("spotify_album_id"),
+            "spotify_album_name": request.POST.get("spotify_album_name"),
+            "spotify_album_type": request.POST.get("spotify_album_type"),
+            "spotify_release_date": request.POST.get("spotify_release_date"),
+            "spotify_duration_ms": int(request.POST.get("spotify_duration_ms", 0)) if request.POST.get("spotify_duration_ms") else 0,
+            "spotify_popularity": int(request.POST.get("spotify_popularity", 0)) if request.POST.get("spotify_popularity") else 0,
+            "spotify_isrc": request.POST.get("spotify_isrc"),
+        }
+
+        try:
+            date_now = convert_to_site_timezone(timezone.now())
+            self.playlist_service.add_playlist_track(
+                date_now=date_now,
+                kino_id="track_search_admin",
+                user=request.user,
+                playlist_id=playlist_id,
+                validated_data=track_data,
+            )
+            messages.success(request, f"「{track_data['spotify_name']}」をプレイリストに追加しました。")
+        except ApplicationError as e:
+            messages.error(request, f"追加に失敗しました: {str(e)}")
+        except Exception as e:
+            messages.error(request, "予期せぬエラーが発生しました。")
+
+        return redirect(request.get_full_path())
