@@ -116,7 +116,16 @@
 
                         <td
                             class="px-4 py-3 align-middle border-t border-base-200 dark:border-base-800 text-font-default-light dark:text-font-default-dark font-medium whitespace-normal">
-                            {{ track.spotify_artist_name|default:"-" }}
+                            {% if track.display_artist_name %}
+                                {{ track.display_artist_name }}
+                                {% if track.display_artist_name != track.spotify_artist_name %}
+                                <div class="text-[10px] text-font-default-light/60 dark:text-font-default-dark/60 font-normal">
+                                    ({{ track.spotify_artist_name }})
+                                </div>
+                                {% endif %}
+                            {% else %}
+                                {{ track.spotify_artist_name|default:"-" }}
+                            {% endif %}
                         </td>
 
                         <td

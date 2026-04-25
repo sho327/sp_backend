@@ -34,6 +34,57 @@ class ArtistService:
         self.storage_service = StorageService()
         self.musicbrainz_service = MusicBrainzService()
 
+    def _resolve_display_names(self, spotify_items: list[dict]) -> dict:
+        """
+        Spotifyのアイテムリスト（'id'と'name'を持つ辞書のリスト）を基に、
+        MusicBrainzから日本語名を取得して {spotify_id: mb_name} のマップを返す。
+        """
+        if not spotify_items:
+            return {}
+
+        # 1. MusicBrainzから日本語名(display_name)を一括検索・特定してマッピング
+        # (URL検索はヒットしづらいため、名前・エイリアスのOR検索で候補を一括取得する)
+        mb_name_map = {}
+        
+        # クエリの構築: artist:"名前" OR alias:"名前"
+        query_parts = []
+        for item in spotify_items:
+            clean_name = item["name"].replace('"', '\\"').replace(':', '\\:')
+            query_parts.append(f'artist:"{clean_name}" OR alias:"{clean_name}"')
+        
+        mb_query = " OR ".join(query_parts)
+        try:
+            # 名前ベースのOR検索を実行 (1リクエストで複数候補をさらってくる)
+            mb_search_results = self.musicbrainz_service.fetch_search_artists(mb_query, limit=20)
+            artists = mb_search_results.get("artists", [])
+            
+            # 名前またはエイリアスによるマッピング
+            for mb_artist in artists:
+                # ===================================================================================================
+                # MEMO: 効率が悪いので、日本のアーティストだけを対象にする(中国等の対応をする場合はレス速度を犠牲にするか改善が必要)
+                # ===================================================================================================
+                if mb_artist.get("country") != "JP":
+                    continue
+                
+                mb_name = mb_artist.get("name")
+                mb_aliases = [a.get("name").lower() for a in mb_artist.get("aliases", [])]
+                
+                # 候補をSpotify側の名前に紐付ける(大小文字無視)
+                for item in spotify_items:
+                    s_name = item["name"].lower()
+                    # --- 誤認防止のロジック ---
+                    # 1. MusicBrainzのメイン名とが完全一致する場合を最優先
+                    if s_name == mb_name.lower():
+                        mb_name_map[item["id"]] = mb_name
+                    # 2. メイン名が一致しないが、エイリアスに含まれる場合 (まだ埋まっていない場合のみ)
+                    elif s_name in mb_aliases:
+                        if item["id"] not in mb_name_map:
+                            mb_name_map[item["id"]] = mb_name
+        except Exception:
+            pass
+
+        return mb_name_map
+
     def _update_external_icon(
         self,
         date_now: datetime,
@@ -634,44 +685,7 @@ class ArtistService:
         )
 
         # 4. MusicBrainzから日本語名(display_name)を一括検索・特定してマッピング
-        # (URL検索はヒットしづらいため、名前・エイリアスのOR検索で候補を一括取得する)
-        mb_name_map = {}
-        if spotify_raw_list:
-            # クエリの構築: artist:"名前" OR alias:"名前"
-            query_parts = []
-            for item in spotify_raw_list:
-                clean_name = item["name"].replace('"', '\\"').replace(':', '\\:')
-                query_parts.append(f'artist:"{clean_name}" OR alias:"{clean_name}"')
-            
-            mb_query = " OR ".join(query_parts)
-            try:
-                # 名前ベースのOR検索を実行 (1リクエストで複数候補をさらってくる)
-                mb_search_results = self.musicbrainz_service.fetch_search_artists(mb_query, limit=20)
-                artists = mb_search_results.get("artists", [])
-                
-                # 名前またはエイリアスによるマッピング
-                for mb_artist in artists:
-                    # ===================================================================================================
-                    # MEMO: 効率が悪いので、日本のアーティストだけを対象にする(中国等の対応をする場合はレス速度を犠牲にするか改善が必要)
-                    # ===================================================================================================
-                    if mb_artist.get("country") != "JP":
-                        continue
-                    mb_name = mb_artist.get("name")
-                    mb_aliases = [a.get("name").lower() for a in mb_artist.get("aliases", [])]
-                    
-                    # 候補をSpotify側の名前に紐付ける(大小文字無視)
-                    for item in spotify_raw_list:
-                        s_name = item["name"].lower()
-                        # --- 誤認防止のロジック ---
-                        # 1. MusicBrainzのメイン名とが完全一致する場合を最優先
-                        if s_name == mb_name.lower():
-                            mb_name_map[item["id"]] = mb_name
-                        # 2. メイン名が一致しないが、エイリアスに含まれる場合 (まだ埋まっていない場合のみ)
-                        elif s_name in mb_aliases:
-                            if item["id"] not in mb_name_map:
-                                mb_name_map[item["id"]] = mb_name
-            except Exception:
-                pass
+        mb_name_map = self._resolve_display_names(spotify_raw_list)
 
         # 5. データの整形
         formatted_results = []

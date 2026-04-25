@@ -23,6 +23,9 @@ from apps.playlist.exceptions import (
     PlaylistTrackNotFoundError,
 )
 
+# --- アーティストモジュール ---
+from apps.artist.services import ArtistService
+
 # --- プレイリストモジュール ---
 from apps.playlist.models import R_PlaylistArtist, T_Playlist, T_PlaylistTrack
 
@@ -49,6 +52,7 @@ class PlaylistService:
         self.storage_service = StorageService()
         self.musicbrainz_service = MusicBrainzService()
         self.lastfm_service = LastfmService()
+        self.artist_service = ArtistService()
 
     def _format_spotify_track(self, track: dict) -> dict:
         """Spotifyのレスポンスを共通フォーマットに変換するプライベートメソッド"""
@@ -58,7 +62,9 @@ class PlaylistService:
             "spotify_id": track.get("id"),
             "spotify_name": track.get("name"),
             "spotify_isrc": track.get("external_ids", {}).get("isrc"),
+            "spotify_artist_id": track.get("artists", [{}])[0].get("id"),
             "spotify_artist_name": track.get("artists", [{}])[0].get("name"),
+            "display_artist_name": None, # 後ほどMusicBrainz等で補完予定
             "spotify_popularity": popularity if popularity is not None else 0,
             "spotify_duration_ms": track.get("duration_ms"),
             "spotify_album_type": album.get("album_type"),
@@ -66,6 +72,39 @@ class PlaylistService:
             "spotify_album_name": album.get("name"),
             "spotify_release_date": album.get("release_date"),
         }
+
+    def _attach_display_artist_names(self, formatted_tracks: List[dict]):
+        """formatted_tracks内のspotify_artist_nameを基に、MusicBrainzから日本語名を取得して反映する"""
+        if not formatted_tracks:
+            return formatted_tracks
+
+        # 1. 検索用のアイテムリストを作成 (resolve_display_namesは id/name を期待する)
+        search_items = []
+        seen_ids = set()
+        for t in formatted_tracks:
+            a_id = t.get("spotify_artist_id")
+            a_name = t.get("spotify_artist_name")
+            if a_id and a_id not in seen_ids:
+                search_items.append({"id": a_id, "name": a_name})
+                seen_ids.add(a_id)
+
+        if not search_items:
+            return formatted_tracks
+
+        # 2. ArtistServiceの共通ロジックで名前解決
+        mb_name_map = self.artist_service._resolve_display_names(search_items)
+
+        # 3. リストに反映
+        for track in formatted_tracks:
+            s_id = track.get("spotify_artist_id")
+            s_name = track.get("spotify_artist_name")
+            if s_id:
+                display_name = mb_name_map.get(s_id)
+                track["display_artist_name"] = display_name or s_name
+            else:
+                track["display_artist_name"] = ""
+
+        return formatted_tracks
 
     # ------------------------------------------------------------------
     # 一覧取得系サービス
@@ -774,6 +813,9 @@ class PlaylistService:
             # アーティストごとの曲を追加
             all_tracks_data.extend(artist_tracks)
 
+        # 5. display_artist_nameの補完
+        self._attach_display_artist_names(all_tracks_data)
+
         return all_tracks_data
 
     # トラック検索※SpotifyAPI使用
@@ -814,21 +856,9 @@ class PlaylistService:
         # 3. レスポンス形式の整形
         formatted_tracks = []
         for track in search_results:
-            popularity = track.get("popularity")
-            album = track.get("album") or {}
-            formatted_tracks.append(
-                {
-                    "spotify_id": track.get("id"),
-                    "spotify_name": track.get("name"),
-                    "spotify_isrc": track.get("external_ids", {}).get("isrc"),
-                    "spotify_artist_name": track.get("artists", [{}])[0].get("name"),
-                    "spotify_popularity": popularity if popularity is not None else 0,
-                    "spotify_duration_ms": track.get("duration_ms"),
-                    "spotify_album_type": album.get("album_type"),
-                    "spotify_album_id": album.get("id"),
-                    "spotify_album_name": album.get("name"),
-                    "spotify_release_date": album.get("release_date"),
-                }
-            )
+            formatted_tracks.append(self._format_spotify_track(track))
+
+        # 4. display_artist_nameの補完
+        self._attach_display_artist_names(formatted_tracks)
 
         return formatted_tracks
