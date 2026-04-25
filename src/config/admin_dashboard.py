@@ -27,11 +27,6 @@ def dashboard_callback(request, context):
         
         # プログレスバー用データ
         "setup_completion_percent": percent,
-        "completion_progress": {
-            "title": "ユーザ初期設定完了率",
-            "description": f"全ユーザのうち {percent}% が初期設定を完了しています。",
-            "value": float(percent)
-        },
         
         # テーブル用データ
         "table_data": {

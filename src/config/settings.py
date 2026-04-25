@@ -231,6 +231,19 @@ UNFOLD = {
                 ],
             },
             {
+                "title": _("カスタムページ"),
+                "separator": True,  # Top border
+                "collapsible": True,  # Collapsible group of links
+                "items": [
+                    {
+                        "title": _("アーティスト検索"),
+                        "icon": "search",  # Supported icon set: https://fonts.google.com/icons
+                        "link": reverse_lazy("admin:artist_search"),
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                ],
+            },
+            {
                 "title": _("アカウント"),
                 "separator": True,  # Top border
                 "collapsible": False,  # Collapsible group of links
@@ -245,6 +258,12 @@ UNFOLD = {
                         "title": _("プロフィールトラン"),
                         "icon": "account_circle",  # Supported icon set: https://fonts.google.com/icons
                         "link": "/admin/account/t_profile/",
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                    {
+                        "title": _("ユーザ発行トークントラン"),
+                        "icon": "token",  # Supported icon set: https://fonts.google.com/icons
+                        "link": "/admin/account/t_usertoken/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                     {

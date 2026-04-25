@@ -112,3 +112,54 @@ class T_ArtistAdmin(SaveAdminMixin, ModelAdmin):
 #     list_filter = (SoftDeleteFilter, )
 #     search_fields = ("artist__name", "tag__name")
 #     readonly_fields = ("created_at", "updated_at")
+
+
+from django.urls import path
+from django.views.generic import TemplateView
+from unfold.views import UnfoldModelAdminViewMixin
+from apps.artist.forms.artist_search import ArtistSearchForm
+from apps.artist.services import ArtistService
+from django.utils import timezone
+from core.utils.date_format import convert_to_site_timezone
+# ------------------------------------------------------------------
+# カスタムページ(アーティスト検索)
+# ------------------------------------------------------------------
+class ArtistSearchView(UnfoldModelAdminViewMixin, TemplateView):
+    title = "アーティスト検索"
+    permission_required = ()
+    template_name = "artist/artist_search.html"
+    artist_service = ArtistService()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        date_now: datetime = convert_to_site_timezone(timezone.now())
+        form = ArtistSearchForm(self.request.GET or None)
+        results = None
+
+        if form.is_valid() and form.cleaned_data.get("q"):
+            data = {
+                "q" :form.cleaned_data["q"],
+                "limit" :form.cleaned_data["limit"],
+            }
+            # サービス実行(アーティスト検索)※SpotifyAPI使用
+            results = self.artist_service.search_artist(
+                date_now=date_now,
+                kino_id="artist_search_admin",
+                user=self.request.user,
+                validated_data=data,
+            )
+
+        context.update({
+            "form": form,
+            "results": results,
+        })
+        return context
+
+class ArtistSearchAdmin(admin.AdminSite):
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path("artist_search/", self.admin_view(ArtistSearchView.as_view(model_admin=self)), name="artist_search"),
+        ]
+        return urls + custom_urls

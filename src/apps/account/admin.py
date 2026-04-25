@@ -72,19 +72,19 @@ class T_ProfileAdmin(SaveAdminMixin, SimpleHistoryAdmin, ModelAdmin):
     search_fields = ("user_id_display", "display_name", "user__email")
     readonly_fields = (
         "user",
-        "user_id_display",
-        "display_name", 
-        "affiliation",
-        "bio",
-        "icon", 
-        "is_setup_completed", 
+        # "user_id_display",
+        # "display_name", 
+        # "affiliation",
+        # "bio",
+        # "icon", 
+        # "is_setup_completed", 
         "created_method",
-        # "updated_method", 
+        "updated_method", 
         "created_at",
         "updated_at",
         "created_by",
         "updated_by",
-        "deleted_at",
+        # "deleted_at",
     )
     # 追加禁止
     def has_add_permission(self, request): return False
@@ -95,12 +95,29 @@ class T_ProfileAdmin(SaveAdminMixin, SimpleHistoryAdmin, ModelAdmin):
 # ------------------------------------------------------------------
 # T_UserToken
 # ------------------------------------------------------------------
-# @admin.register(T_UserToken)
-# class T_UserTokenAdmin(SaveAdminMixin, ModelAdmin):
-#     list_display = ("user", "token_type", "expired_at", "created_at", "deleted_at")
-#     list_filter = (SoftDeleteFilter, "token_type", "expired_at", "deleted_at")
-#     search_fields = ("user__email", "token_hash")
-#     readonly_fields = ("created_at", "updated_at")
+@admin.register(T_UserToken)
+class T_UserTokenAdmin(SaveAdminMixin, ModelAdmin):
+    list_display = ("user", "token_type", "expired_at", "created_at", "deleted_at")
+    list_filter = (SoftDeleteFilter, "token_type", "expired_at", "deleted_at")
+    search_fields = ("user__email", "token_hash")
+    readonly_fields = (
+        "user",
+        "token_type",
+        "token_hash",
+        # "expired_at",
+        "created_method",
+        "updated_method", 
+        "created_at",
+        "updated_at",
+        "created_by",
+        "updated_by",
+        # "deleted_at",
+    )
+    # 追加禁止
+    def has_add_permission(self, request): return False
+    # 削除禁止
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 # ------------------------------------------------------------------
 # T_LoginHistory

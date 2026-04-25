@@ -1,0 +1,32 @@
+{% extends "admin/base.html" %}
+{% load unfold %}
+
+{% block content %}
+<h1 class="text-xl font-bold mb-4">ユーザー検索</h1>
+
+<form method="get" class="mb-6">
+    {{ form.as_p }}
+    <button class="btn btn-primary">検索</button>
+</form>
+
+{% if results %}
+<table class="table-auto w-full border">
+    <thead>
+        <tr>
+            <th class="border px-2 py-1">ID</th>
+            <th class="border px-2 py-1">名前</th>
+            <th class="border px-2 py-1">メール</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user in results %}
+        <tr>
+            <td class="border px-2 py-1">{{ user.id }}</td>
+            <td class="border px-2 py-1">{{ user.name }}</td>
+            <td class="border px-2 py-1">{{ user.email }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}
