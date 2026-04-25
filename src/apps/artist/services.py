@@ -622,15 +622,29 @@ class ArtistService:
         formatted_results = []
         for item in spotify_raw_list:
             s_id = str(item["id"])
+            s_name = item["name"]
 
             # Spotifyの画像配列からURLを取得(一番大きいサイズを想定)
             images = item.get("images", [])
             icon_url = images[0]["url"] if images else None
 
+            # --- MusicBrainzから日本語名を取得を試行 ---
+            display_name = s_name
+            try:
+                # SpotifyIDからMusicBrainz情報を解決
+                mb_result = self.musicbrainz_service.get_artist_by_spotify_id(s_id)
+                if mb_result and mb_result.get("name"):
+                    # MusicBrainzの登録名(日本アーティストなら通常日本語)を表示名とする
+                    display_name = mb_result.get("name")
+            except Exception:
+                # 取得失敗時はSpotifyの名前を維持
+                pass
+
             formatted_results.append(
                 {
                     "spotify_id": s_id,
-                    "spotify_name": item["name"],
+                    "spotify_name": s_name,
+                    "display_name": display_name,
                     "icon_url": icon_url,
                     "is_registered": s_id in registered_ids,
                 }

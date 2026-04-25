@@ -21,5 +21,6 @@ class ArtistSearchResponseSerializer(serializers.Serializer):
 
     spotify_id = serializers.CharField()
     spotify_name = serializers.CharField()
+    display_name = serializers.CharField()
     icon_url = serializers.URLField(allow_null=True)
     is_registered = serializers.BooleanField(default=False)

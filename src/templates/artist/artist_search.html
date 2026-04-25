@@ -84,6 +84,7 @@
                     {% csrf_token %}
                     <input type="hidden" name="spotify_id" value="{{ artist.spotify_id }}">
                     <input type="hidden" name="spotify_name" value="{{ artist.spotify_name }}">
+                    <input type="hidden" name="display_name" value="{{ artist.display_name }}">
                     <input type="hidden" name="icon_url" value="{{ artist.icon_url|default:'' }}">
                     <button type="submit"
                         class="bg-primary-600 text-white text-xs font-bold px-2 py-0.5 sm:px-3 sm:py-1 rounded-full shadow border-2 border-white dark:border-base-900 flex items-center gap-1 hover:bg-primary-700 transition-colors cursor-pointer"
@@ -113,9 +114,14 @@
         <!-- アーティスト情報 -->
         <div class="mt-4 text-center w-full px-2 flex flex-col items-center">
             <h3 class="font-bold text-font-important-light dark:text-font-important-dark text-[15px] truncate w-full group-hover:text-primary-600 transition-colors"
-                title="{{ artist.spotify_name }}">
-                {{ artist.spotify_name }}
+                title="{{ artist.display_name }}">
+                {{ artist.display_name }}
             </h3>
+            {% if artist.display_name != artist.spotify_name %}
+            <p class="text-[10px] text-font-default-light/60 dark:text-font-default-dark/60 truncate w-full px-2" title="{{ artist.spotify_name }}">
+                ({{ artist.spotify_name }})
+            </p>
+            {% endif %}
             <p class="text-[11px] text-font-default-light dark:text-font-default-dark mt-1 font-mono truncate w-max max-w-full bg-base-100 dark:bg-base-800 py-1 px-2.5 rounded shadow-sm border border-base-200 dark:border-base-700"
                 title="{{ artist.spotify_id }}">
                 {{ artist.spotify_id }}

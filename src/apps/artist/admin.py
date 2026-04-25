@@ -163,6 +163,7 @@ class ArtistSearchView(UnfoldModelAdminViewMixin, TemplateView):
     def post(self, request, *args, **kwargs):
         spotify_id = request.POST.get("spotify_id")
         spotify_name = request.POST.get("spotify_name")
+        display_name = request.POST.get("display_name")
         icon_url = request.POST.get("icon_url")
         
         if not spotify_id or not spotify_name:
@@ -173,7 +174,7 @@ class ArtistSearchView(UnfoldModelAdminViewMixin, TemplateView):
                 validated_data = {
                     "spotify_id": spotify_id,
                     "spotify_name": spotify_name,
-                    "display_name": spotify_name,
+                    "display_name": display_name if display_name else spotify_name,
                     "icon_url": icon_url if icon_url else None
                 }
                 self.artist_service.create_artist(
