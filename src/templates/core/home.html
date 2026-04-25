@@ -28,13 +28,13 @@
 
 <!-- 統計カード -->
 <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-    {% component "unfold/components/card.html" with title="登録アーティスト" %}
+    {% component "unfold/components/card.html" with title="登録アーティスト数" %}
     <p class="text-3xl font-bold text-primary-600">{{ my_artists_count }}</p>
     {% endcomponent %}
-    {% component "unfold/components/card.html" with title="管理プレイリスト" %}
+    {% component "unfold/components/card.html" with title="登録プレイリスト数" %}
     <p class="text-3xl font-bold text-purple-600">{{ my_playlists_count }}</p>
     {% endcomponent %}
-    {% component "unfold/components/card.html" with title="登録済み楽曲" %}
+    {% component "unfold/components/card.html" with title="登録楽曲数" %}
     <p class="text-3xl font-bold text-green-600">{{ my_tracks_count }}</p>
     {% endcomponent %}
 </div>
@@ -53,13 +53,14 @@
         {% component "unfold/components/card.html" with title="クイックアクセス" %}
         <div class="grid grid-cols-1 gap-2 p-2">
             {% for shortcut in shortcuts %}
-            <a href="{% url 'admin:'|add:shortcut.url %}" 
-               class="flex items-center gap-3 p-3 rounded-lg border border-base-200 dark:border-base-800 hover:bg-base-50 dark:hover:bg-base-900 transition-colors group">
+            <a href="{% url 'admin:'|add:shortcut.url %}"
+                class="flex items-center gap-3 p-3 rounded-lg border border-base-200 dark:border-base-800 hover:bg-base-50 dark:hover:bg-base-900 transition-colors group">
                 <span class="material-symbols-outlined {{ shortcut.color }} text-[20px]">{{ shortcut.icon }}</span>
                 <span class="text-sm font-bold text-font-important-light dark:text-font-important-dark flex-grow">
                     {{ shortcut.title }}
                 </span>
-                <span class="material-symbols-outlined text-base-300 group-hover:translate-x-1 transition-transform text-[18px]">chevron_right</span>
+                <span
+                    class="material-symbols-outlined text-base-300 group-hover:translate-x-1 transition-transform text-[18px]">chevron_right</span>
             </a>
             {% endfor %}
         </div>

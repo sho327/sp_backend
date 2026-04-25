@@ -132,6 +132,7 @@ MIDDLEWARE = [
     # Django 標準 Middleware
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",      # Adminを使用する場合は必要
+    "django.middleware.locale.LocaleMiddleware",  # マルチ言語対応(管理画面の日本語化に必須)
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -171,9 +172,9 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 UNFOLD = {
-    "SITE_TITLE": "SpotifyMixer/Admin",
+    "SITE_TITLE": "SpotifyMixer 管理画面",
     "SITE_HEADER": "SpotifyMixer",
-    "SITE_SUBHEADER": "管理者用",
+    "SITE_SUBHEADER": lambda request: "管理者用" if request.user.is_superuser else "一般用",
     # "SITE_DROPDOWN": [
     #     {
     #         "icon": "diamond",
@@ -182,7 +183,7 @@ UNFOLD = {
     #         "link": "/admin/",
     #     },
     # ],
-    "SITE_URL": "/",
+    "SITE_URL": "/unfold/",
     "SHOW_HISTORY": True, # show/hide "History" button, default: True
     "SHOW_VIEW_ON_SITE": False, # show/hide "View on site" button, default: True
     "SHOW_BACK_BUTTON": False, # show/hide "Back" button on changeform in header, default: False
@@ -223,27 +224,27 @@ UNFOLD = {
                 "collapsible": False,  # Collapsible group of links
                 "items": [
                     {
-                        "title": _("ダッシュボード"),
-                        "icon": "dashboard",  # Supported icon set: https://fonts.google.com/icons
+                        "title": _("ホーム"),
+                        "icon": "home",  # Supported icon set: https://fonts.google.com/icons
                         "link": reverse_lazy("admin:index"),
-                        "permission": lambda request: request.user.is_superuser,
-                    },
-                    {
-                        "title": _("ユーザアクティビティ"),
-                        "icon": "browse_activity",  # Supported icon set: https://fonts.google.com/icons
-                        "link": reverse_lazy("admin:user_activity"),
-                        "permission": lambda request: request.user.is_superuser,
+                        "permission": lambda request: True,
                     },
                     {
                         "title": _("アーティスト検索"),
                         "icon": "search",  # Supported icon set: https://fonts.google.com/icons
                         "link": reverse_lazy("admin:artist_search"),
-                        "permission": lambda request: request.user.is_superuser,
+                        "permission": lambda request: True,
                     },
                     {
                         "title": _("トラック検索"),
                         "icon": "search",  # Supported icon set: https://fonts.google.com/icons
                         "link": reverse_lazy("admin:track_search"),
+                        "permission": lambda request: True,
+                    },
+                    {
+                        "title": _("ユーザアクティビティ"),
+                        "icon": "browse_activity",  # Supported icon set: https://fonts.google.com/icons
+                        "link": reverse_lazy("admin:user_activity"),
                         "permission": lambda request: request.user.is_superuser,
                     },
                 ],
@@ -382,6 +383,11 @@ LANGUAGE_CODE = "ja"
 TIME_ZONE = "Asia/Tokyo"
 USE_I18N = True
 USE_TZ = True
+
+# ログイン/ログアウト関連 (カスタムパス /unfold/ に合わせる)
+LOGIN_URL = "/unfold/login/"
+LOGIN_REDIRECT_URL = "/unfold/"
+LOGOUT_REDIRECT_URL = "/unfold/login/"
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/

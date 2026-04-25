@@ -1,0 +1,62 @@
+{% extends "unfold/layouts/skeleton.html" %}
+
+{% load i18n unfold %}
+
+{% block body_class %}{{ block.super }} bg-base-50 dark:bg-base-950{% endblock %}
+
+{% block content %}
+    <div class="flex flex-col items-center justify-center min-h-screen p-6">
+        <div class="w-full max-w-sm space-y-8">
+            <div class="text-center">
+                <h1 class="text-4xl font-black text-font-important-light dark:text-font-important-dark tracking-tight mb-2">
+                    <span class="text-primary-600">Spotify</span>Mixer
+                </h1>
+                <p class="text-sm font-bold text-font-default-light/60 dark:text-font-default-dark/60 uppercase tracking-widest">
+                    管理パネル
+                </p>
+            </div>
+
+            {% component "unfold/components/card.html" with class="p-8 shadow-2xl border-none ring-1 ring-base-200 dark:ring-base-800" %}
+                <form action="{{ app_path }}" method="post" id="login-form">
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                        <div class="mb-6">
+                            {% for error in form.non_field_errors %}
+                                {% component "unfold/components/text.html" with color="danger" class="text-xs font-bold bg-danger-50 dark:bg-danger-900/20 p-3 rounded-lg border border-danger-200 dark:border-danger-800 mb-2 block" %}
+                                    {{ error }}
+                                {% endcomponent %}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <div class="space-y-5">
+                        <div class="space-y-1.5">
+                            <label for="id_username" class="text-xs font-bold text-font-default-light dark:text-font-default-dark uppercase tracking-wider ml-1">メールアドレス</label>
+                            {% component "unfold/components/field.html" with field=form.username placeholder="example@domain.com" %}
+                            {% endcomponent %}
+                        </div>
+
+                        <div class="space-y-1.5">
+                            <label for="id_password" class="text-xs font-bold text-font-default-light dark:text-font-default-dark uppercase tracking-wider ml-1">パスワード</label>
+                            {% component "unfold/components/field.html" with field=form.password placeholder="••••••••" %}
+                            {% endcomponent %}
+                        </div>
+
+                        <div class="pt-2">
+                            {% component "unfold/components/button.html" with type="submit" color="primary" class="w-full py-3 text-sm font-black uppercase tracking-widest shadow-lg shadow-primary-600/20" %}
+                                ログイン
+                            {% endcomponent %}
+                        </div>
+                    </div>
+                </form>
+            {% endcomponent %}
+
+            <div class="text-center pt-4">
+                <p class="text-[11px] text-font-default-light/40 dark:text-font-default-dark/40 font-medium tracking-tight">
+                    &copy; 2026 SpotifyMixer. システムへのアクセスは記録されています。
+                </p>
+            </div>
+        </div>
+    </div>
+{% endblock %}

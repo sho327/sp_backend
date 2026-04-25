@@ -134,11 +134,19 @@ class DashboardView(UnfoldModelAdminViewMixin, TemplateView):
         }
 
         # クイックアクセスリンク
-        context["shortcuts"] = [
+        shortcuts = [
             {"title": "アーティスト検索", "icon": "person_search", "url": "artist_search", "color": "text-primary-600"},
-            {"title": "トラック検索", "icon": "library_music", "url": "track_search", "color": "text-green-600"},
-            {"title": "プレイリスト管理", "icon": "featured_play_list", "url": "playlist_t_playlist_changelist", "color": "text-purple-600"},
+            {"title": "トラック検索", "icon": "library_music", "url": "track_search", "color": "text-primary-600"},
         ]
+        
+        # 管理者のみ表示
+        if user.is_superuser:
+            shortcuts.extend([
+                {"title": "アーティスト管理", "icon": "artist", "url": "artist_t_artist_changelist", "color": "text-slate-600"},
+                {"title": "プレイリスト管理", "icon": "playlist_play", "url": "playlist_t_playlist_changelist", "color": "text-slate-600"},
+            ])
+
+        context["shortcuts"] = shortcuts
         
         return context
 

@@ -10,8 +10,8 @@ from apps.playlist.urls import router as playlist_router
 BASE_API_PATH = "api/v1"
 
 urlpatterns = [
-    # 管理者機能
-    path("admin/", admin.site.urls),
+    # unfold関連機能
+    path("unfold/", admin.site.urls),
     # アカウント機能
     path(f"{BASE_API_PATH}/accounts/", include(account_router.urls)),
     path(f"{BASE_API_PATH}/accounts/", include("apps.account.urls")),

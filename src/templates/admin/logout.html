@@ -1,0 +1,39 @@
+{% extends "unfold/layouts/skeleton.html" %}
+
+{% load i18n unfold %}
+
+{% block body_class %}{{ block.super }} bg-base-50 dark:bg-base-950{% endblock %}
+
+{% block content %}
+    <div class="flex flex-col items-center justify-center min-h-screen p-6">
+        <div class="w-full max-w-sm space-y-8 text-center">
+            <div class="mb-4">
+                <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-50 dark:bg-green-900/20 text-green-600 mb-6 border border-green-100 dark:border-green-800">
+                    <span class="material-symbols-outlined text-[40px]">check_circle</span>
+                </div>
+                <h1 class="text-3xl font-black text-font-important-light dark:text-font-important-dark tracking-tight mb-2">
+                    ログアウト完了
+                </h1>
+                <p class="text-font-default-light/60 dark:text-font-default-dark/60 text-sm font-medium">
+                    ご利用ありがとうございました。安全に管理パネルを終了しました。
+                </p>
+            </div>
+
+            {% component "unfold/components/card.html" with class="p-6 border-none ring-1 ring-base-200 dark:ring-base-800" %}
+                <p class="text-xs text-font-default-light/50 dark:text-font-default-dark/50 mb-6 leading-relaxed font-medium">
+                    情報の漏洩を防ぐため、共有端末をご利用の場合はブラウザのタブを閉じることをお勧めします。
+                </p>
+                
+                {% component "unfold/components/button.html" with link="/unfold/login/" color="primary" class="w-full py-3 text-sm font-black uppercase tracking-widest shadow-lg shadow-primary-600/20" %}
+                    再びログインする
+                {% endcomponent %}
+            {% endcomponent %}
+
+            <div class="pt-4">
+                <a href="/" class="text-xs font-bold text-base-400 dark:text-base-600 hover:text-primary-600 transition-colors">
+                    &larr; ホームへ戻る
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
