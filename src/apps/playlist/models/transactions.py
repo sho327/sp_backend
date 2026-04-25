@@ -124,6 +124,13 @@ class T_PlaylistTrack(BaseModel):
         db_comment="Spotify/ISRC",
         max_length=12,
     )
+    # SpotifyアーティストID
+    spotify_artist_id = models.CharField(
+        db_column="spotify_artist_id",
+        verbose_name="SpotifyアーティストID",
+        db_comment="SpotifyアーティストID",
+        max_length=255,
+    )
     # Spotifyアーティスト名
     spotify_artist_name = models.CharField(
         db_column="spotify_artist_name",

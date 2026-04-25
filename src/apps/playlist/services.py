@@ -718,7 +718,7 @@ class PlaylistService:
                     {
                         "name": deezer_artist["name"],
                         "deezer_id": str(deezer_artist["id"]),
-                        "setlistfm_mbid": None,  # 必要に応じてMBID検索を行う
+                        "mbid": None,  # 必要に応じてMBID検索を行う
                         "need_mbid_fetch": True,
                     }
                 )
@@ -768,8 +768,6 @@ class PlaylistService:
 
                     if s_results:
                         s_track = s_results[0]
-                        popularity = s_track.get("popularity")
-                        album = s_track.get("album") or {}
                         artist_tracks.append(
                             artist_tracks.append(self._format_spotify_track(s_track))
                         )
@@ -777,7 +775,7 @@ class PlaylistService:
             # B. 最近のセトリ(set_list)
             elif pattern == "set_list":
                 # MBID取得
-                mbid = artist.get("setlistfm_mbid")
+                mbid = artist.get("mbid")
 
                 # 必要であればMusicBrainzから取り直し
                 if not mbid or artist.get("need_mbid_fetch"):

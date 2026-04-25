@@ -12,7 +12,7 @@ class ArtistInputSerializer(serializers.Serializer):
     # SpotifyAPIへ直近のセトリの曲名/アーティスト名称で検索する際に利用
     name = serializers.CharField(required=False)
     # ※こちらは未設定も許可する/未設定の場合は、サービス側で「MusicBrainz」より最新のMBIDの取得を行った上で直近のセトリ取得を実行
-    setlistfm_mbid = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    mbid = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
 class TracksGenerateRequestSerializer(serializers.Serializer):
     """

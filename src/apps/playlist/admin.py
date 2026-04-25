@@ -71,7 +71,10 @@ class T_PlaylistTrackAdmin(SaveAdminMixin, ModelAdmin):
 
     fieldsets = (
         (None, {"fields": ("id", "playlist")}),
-        ("Spotify 基本情報", {"fields": ("spotify_id", "spotify_name", "spotify_artist_name", "spotify_isrc")}),
+        ("Spotify 基本情報", {"fields": (
+            "spotify_id", "spotify_name", "display_artist_name", "spotify_artist_id", 
+            "spotify_artist_name", "spotify_isrc"
+        )}),
         ("アルバム・メタ情報", {"fields": (
             "spotify_album_id", "spotify_album_name", "spotify_album_type", 
             "spotify_release_date", "spotify_duration_ms", "spotify_popularity"
