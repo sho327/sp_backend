@@ -161,4 +161,4 @@ class T_Artist(BaseModel):
         ]
 
     def __str__(self):
-        return f"{self.name} ({self.spotify_id}/{self.deezer_id})"
+        return f"{self.spotify_name} ({self.spotify_id}/{self.deezer_id})"

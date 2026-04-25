@@ -343,7 +343,7 @@ class ArtistService:
         if validated_data.get("icon_url"):
             spotify_image = T_FileResource.objects.create(
                 file_type=T_FileResource.FileType.IMAGE,
-                url=validated_data["icon_url"],
+                external_url=validated_data["icon_url"],
                 file_name=f"spotify_{validated_data['spotify_name']}_icon",
                 created_by=user,
                 created_method=kino_id,
@@ -366,7 +366,7 @@ class ArtistService:
             external_icon=spotify_image,
             deezer_id=linked_ids["deezer_id"],
             is_deezer_autoset=linked_ids["is_deezer_autoset"],
-            lastfm_name=linked_ids["lastfm_name"],
+            lastfm_name=None,
             mbid=linked_ids["mbid"],
             is_mbid_autoset=linked_ids["is_mbid_autoset"],
             # validated_data['context_id'] は既にモデルインスタンスになっている

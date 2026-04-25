@@ -121,6 +121,11 @@ from apps.artist.forms.artist_search import ArtistSearchForm
 from apps.artist.services import ArtistService
 from django.utils import timezone
 from core.utils.date_format import convert_to_site_timezone
+from core.utils.log_helpers import log_output_by_msg_id
+from core.consts import LOG_METHOD
+from django.contrib import messages
+from django.shortcuts import redirect
+from core.exceptions.exceptions import ApplicationError
 # ------------------------------------------------------------------
 # カスタムページ(アーティスト検索)
 # ------------------------------------------------------------------
@@ -154,3 +159,49 @@ class ArtistSearchView(UnfoldModelAdminViewMixin, TemplateView):
             "results": results,
         })
         return context
+
+    def post(self, request, *args, **kwargs):
+        spotify_id = request.POST.get("spotify_id")
+        spotify_name = request.POST.get("spotify_name")
+        icon_url = request.POST.get("icon_url")
+        
+        if not spotify_id or not spotify_name:
+            messages.error(request, "必要な情報が不足しています。")
+        else:
+            try:
+                date_now = convert_to_site_timezone(timezone.now())
+                validated_data = {
+                    "spotify_id": spotify_id,
+                    "spotify_name": spotify_name,
+                    "display_name": spotify_name,
+                    "icon_url": icon_url if icon_url else None
+                }
+                self.artist_service.create_artist(
+                    date_now=date_now,
+                    kino_id="artist_search_admin",
+                    user=request.user,
+                    validated_data=validated_data,
+                )
+                messages.success(request, f"{spotify_name} をシステムに登録しました！")
+            except ApplicationError as e:
+                log_output_by_msg_id(
+                    log_id="MSGE001",
+                    params=[f"登録エラー: {str(e)}"],
+                    logger_name=LOG_METHOD.APPLICATION.value,
+                )
+                messages.error(request, f"登録エラー: {str(e)}")
+            except Exception as e:
+                log_output_by_msg_id(
+                    log_id="MSGE001",
+                    params=[f"予期せぬエラー: {str(e)}"],
+                    logger_name=LOG_METHOD.APPLICATION.value,
+                )
+                messages.error(request, "登録中に予期せぬエラーが発生しました。")
+                
+        # 元の検索画面（同じクエリストリング）にリダイレクト
+        query_string = request.GET.urlencode()
+        url = request.path
+        if query_string:
+            url += f"?{query_string}"
+        return redirect(url)
+
