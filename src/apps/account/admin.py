@@ -51,9 +51,40 @@ class M_UserAdmin(SaveAdminMixin, SimpleHistoryAdmin, ModelAdmin):
         ("システム情報", {"fields": ("created_method", "updated_method")}),
     )
     readonly_fields = ("id", "last_login", "created_at", "created_method",  "updated_at")
+    
+    # def get_queryset(self, request):
+    #     qs = super().get_queryset(request)
+    #     if request.user.is_superuser:
+    #         return qs
+    #     # 一般スタッフは自分のみ表示
+    #     return qs.filter(id=request.user.id)
+    
+    # def has_change_permission(self, request, obj=None):
+    #     # スーパーユーザーは無条件でOK
+    #     if request.user.is_superuser:
+    #         return True
+    #     # 対象のオブジェクトがある場合、その所有者が自分かチェック
+    #     if obj is not None and obj.user != request.user:
+    #         return False
+    #     # 基本的な変更権限があるか確認
+    #     return super().has_change_permission(request, obj)
+
+    # def has_view_permission(self, request, obj=None):
+    #     if request.user.is_superuser:
+    #         return True
+    #     if obj is not None and obj.user != request.user:
+    #         return False
+    #     return super().has_view_permission(request, obj)
+    
     # 削除禁止
     def has_delete_permission(self, request, obj=None):
         return False
+    
+    # def save_model(self, request, obj, form, change):
+    #     if not change:  # 新規作成時
+    #         if not request.user.is_superuser:
+    #             obj.user = request.user
+    #     super().save_model(request, obj, form, change)
 
 # ------------------------------------------------------------------
 # T_Profile
@@ -87,6 +118,12 @@ class T_ProfileAdmin(SaveAdminMixin, SimpleHistoryAdmin, ModelAdmin):
         "updated_by",
         # "deleted_at",
     )
+    # def get_queryset(self, request):
+    #     qs = super().get_queryset(request)
+    #     if request.user.is_superuser:
+    #         return qs
+    #     # 一般スタッフは自分が紐付いているデータのみ表示
+    #     return qs.filter(user=request.user)
     # 追加禁止
     def has_add_permission(self, request): return False
     # 削除禁止

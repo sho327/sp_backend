@@ -3,6 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
 from unfold.admin import ModelAdmin
 from apps.common.models import T_FileResource
+from django.db.models import Q
 
 # 共通Mixin
 class SaveAdminMixin:
@@ -61,3 +62,14 @@ class T_FileResourceAdmin(SaveAdminMixin, ModelAdmin):
             return f"{round(obj.file_size / 1024, 2)} KB"
         return "-"
     file_size_kb.short_description = "サイズ"
+
+    # def get_queryset(self, request):
+    #     qs = super().get_queryset(request)
+    #     if request.user.is_superuser:
+    #         return qs
+    #     # 一般スタッフは自分に紐づくデータのみ表示
+    #     return qs.filter(
+    #         Q(icon_t_profile_set=request.user) | 
+    #         Q(external_icon_t_artist_set=request.user) | 
+    #         Q(image_t_playlist_set=request.user)
+    #     )

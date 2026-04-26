@@ -55,9 +55,18 @@ class M_ArtistTagAdmin(SaveAdminMixin, ModelAdmin):
         "updated_by",
         # "deleted_at",
     )
+
     # 整合性が取れないので、削除禁止
     def has_delete_permission(self, request, obj=None):
         return False
+
+    # def has_delete_permission(self, request, obj=None):
+    #     # 削除はスーパーユーザーのみ
+    #     return request.user.is_superuser
+
+    # def has_change_permission(self, request, obj=None):
+    #     # 編集権限の基本ロジック（必要に応じてスタッフ個別の条件を追加）
+    #     return super().has_change_permission(request, obj)
 
 @admin.register(M_ArtistContext)
 class M_ArtistContextAdmin(SaveAdminMixin, ModelAdmin):
@@ -78,6 +87,14 @@ class M_ArtistContextAdmin(SaveAdminMixin, ModelAdmin):
     # 整合性が取れないので、削除禁止
     def has_delete_permission(self, request, obj=None):
         return False
+
+    # def has_delete_permission(self, request, obj=None):
+    #     # 削除はスーパーユーザーのみ
+    #     return request.user.is_superuser
+
+    # def has_change_permission(self, request, obj=None):
+    #     # 編集権限の基本ロジック（必要に応じてスタッフ個別の条件を追加）
+    #     return super().has_change_permission(request, obj)
 
 # ------------------------------------------------------------------
 # T_Artist
@@ -102,6 +119,37 @@ class T_ArtistAdmin(SaveAdminMixin, ModelAdmin):
             "classes": ("collapse",)
         }),
     )
+
+    # def get_queryset(self, request):
+    #     qs = super().get_queryset(request)
+    #     if request.user.is_superuser:
+    #         return qs
+    #     # 一般スタッフは自分が紐付いているデータのみ表示
+    #     return qs.filter(user=request.user)
+
+    # def get_fieldsets(self, request, obj=None):
+    #     fieldsets = super().get_fieldsets(request, obj)
+    #     # スーパーユーザーでない（一般スタッフ）の場合
+    #     if not request.user.is_superuser:
+    #         # 例えば「システム情報」を非表示にする
+    #         fieldsets = [fs for fs in fieldsets if fs[0] != "システム情報"]
+    #     return fieldsets
+    
+    # def get_readonly_fields(self, request, obj=None):
+    #     readonly_fields = super().get_readonly_fields(request, obj)
+    #     if not request.user.is_superuser:
+    #         # スタッフにはSpotifyIDや連携情報を編集させない
+    #         readonly_fields += ("spotify_id", "mbid", "deezer_id", "user")
+    #     return readonly_fields
+    
+    # def has_delete_permission(self, request, obj=None):
+    #     # 削除はスーパーユーザーのみ
+    #     return request.user.is_superuser
+
+    # def has_change_permission(self, request, obj=None):
+    #     # 編集権限の基本ロジック（必要に応じてスタッフ個別の条件を追加）
+    #     return super().has_change_permission(request, obj)
+    
 
 # ------------------------------------------------------------------
 # R_ArtistTag

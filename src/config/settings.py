@@ -257,25 +257,25 @@ UNFOLD = {
                     {
                         "title": _("ユーザマスタ"),
                         "icon": "people",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/unfold/account/m_user/",
+                        "link": "/admin/account/m_user/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                     {
                         "title": _("プロフィールトラン"),
                         "icon": "account_circle",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/unfold/account/t_profile/",
+                        "link": "/admin/account/t_profile/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                     {
                         "title": _("ユーザ発行トークントラン"),
                         "icon": "token",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/unfold/account/t_usertoken/",
+                        "link": "/admin/account/t_usertoken/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                     {
                         "title": _("ログイン履歴トラン"),
                         "icon": "history",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/unfold/account/t_loginhistory/",
+                        "link": "/admin/account/t_loginhistory/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                 ],
@@ -288,19 +288,19 @@ UNFOLD = {
                     {
                         "title": _("アーティストトラン"),
                         "icon": "artist",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/unfold/artist/t_artist/",
+                        "link": "/admin/artist/t_artist/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                     {
                         "title": _("アーティストコンテキストマスタ"),
                         "icon": "topic",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/unfold/artist/m_artistcontext/",
+                        "link": "/admin/artist/m_artistcontext/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                     {
                         "title": _("アーティストタグマスタ"),
                         "icon": "more",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/unfold/artist/m_artisttag/",
+                        "link": "/admin/artist/m_artisttag/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                 ],
@@ -313,13 +313,13 @@ UNFOLD = {
                     {
                         "title": _("プレイリストトラン"),
                         "icon": "album",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/unfold/playlist/t_playlist/",
+                        "link": "/admin/playlist/t_playlist/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                     {
                         "title": _("プレイリストトラックトラン"),
                         "icon": "music_note",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/unfold/playlist/t_playlisttrack/",
+                        "link": "/admin/playlist/t_playlisttrack/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                 ],
@@ -332,7 +332,7 @@ UNFOLD = {
                     {
                         "title": _("ファイルリソーストラン"),
                         "icon": "folder",  # Supported icon set: https://fonts.google.com/icons
-                        "link": "/unfold/common/t_fileresource/",
+                        "link": "/admin/common/t_fileresource/",
                         "permission": lambda request: request.user.is_superuser,
                     },
                 ],
@@ -341,10 +341,10 @@ UNFOLD = {
     },
 }
 
-# ログイン/ログアウト関連(カスタムパス/unfold/に合わせる)
-LOGIN_URL = "/unfold/login/"
-LOGIN_REDIRECT_URL = "/unfold/"
-LOGOUT_REDIRECT_URL = "/unfold/login/"
+# ログイン/ログアウト関連(カスタムパス/admin/に合わせる)
+LOGIN_URL = "/admin/login/"
+LOGIN_REDIRECT_URL = "/admin/"
+LOGOUT_REDIRECT_URL = "/admin/login/"
 
 # ==============================================================================
 # 5. データベース定義、データベース認証方式

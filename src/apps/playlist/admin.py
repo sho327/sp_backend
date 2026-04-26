@@ -61,6 +61,12 @@ class T_PlaylistAdmin(SaveAdminMixin, ModelAdmin):
             "classes": ("collapse",)
         }),
     )
+    # def get_queryset(self, request):
+    #     qs = super().get_queryset(request)
+    #     if request.user.is_superuser:
+    #         return qs
+    #     # 一般スタッフは自分が紐付いているデータのみ表示
+    #     return qs.filter(user=request.user)
 
 @admin.register(T_PlaylistTrack)
 class T_PlaylistTrackAdmin(SaveAdminMixin, ModelAdmin):
@@ -84,6 +90,12 @@ class T_PlaylistTrackAdmin(SaveAdminMixin, ModelAdmin):
             "classes": ("collapse",)
         }),
     )
+    # def get_queryset(self, request):
+    #     qs = super().get_queryset(request)
+    #     if request.user.is_superuser:
+    #         return qs
+    #     # 一般スタッフは自分が紐付いているデータのみ表示
+    #     return qs.filter(playlist__user=request.user)
 
 # @admin.register(R_PlaylistArtist)
 # class R_PlaylistArtistAdmin(SaveAdminMixin, ModelAdmin):
