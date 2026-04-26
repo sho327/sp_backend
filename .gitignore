@@ -17,3 +17,5 @@ mise.toml
 start.ps1
 start.sh
 gunicorn.py
+.cache
+.coverage
